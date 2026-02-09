@@ -83,6 +83,9 @@
 #if !MESHTASTIC_EXCLUDE_EXTERNALNOTIFICATION
 #include "modules/ExternalNotificationModule.h"
 #endif
+#if defined(T_DECK_PRO_VOICE)
+#include "notification/NotificationManager.h"
+#endif
 #if !MESHTASTIC_EXCLUDE_RANGETEST && !MESHTASTIC_EXCLUDE_GPS
 #include "modules/RangeTestModule.h"
 #endif
@@ -237,6 +240,9 @@ void setupModules()
 #endif
 #if !MESHTASTIC_EXCLUDE_EXTERNALNOTIFICATION
     externalNotificationModule = new ExternalNotificationModule();
+#endif
+#if defined(T_DECK_PRO_VOICE)
+    notificationManager = new NotificationManager();
 #endif
 #if !MESHTASTIC_EXCLUDE_RANGETEST && !MESHTASTIC_EXCLUDE_GPS
     if (moduleConfig.has_range_test && moduleConfig.range_test.enabled)
