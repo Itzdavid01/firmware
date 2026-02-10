@@ -19,19 +19,19 @@
 
 NotificationManager *notificationManager = nullptr;
 
-NotificationManager::NotificationManager()
-    : MeshModule("NotificationManager"), concurrency::OSThread("NotificationMgr"), audioEnabled(true), hapticEnabled(true),
-      hardwareInitialized(false)
-{
-    // We want to see all decoded packets, not just a single portnum
-    isPromiscuous = true;
+// Struct passed through the FreeRTOS queue
+struct NotifyEvent {
+    NotificationManager::MessageType type;
+    bool audioOn;
+    bool hapticOn;
+};
 
-    LOG_INFO("NotificationManager: created (audio=%s, haptic=%s)", audioEnabled ? "on" : "off", hapticEnabled ? "on" : "off");
-}
+// Flag to track if hardware has been initialized (done once in the playback task)
+static bool hwInitDone = false;
 
 void NotificationManager::initHardware()
 {
-    if (hardwareInitialized) {
+    if (hwInitDone) {
         return;
     }
 
@@ -53,13 +53,152 @@ void NotificationManager::initHardware()
     }
 #endif
 
-    hardwareInitialized = true;
-    LOG_INFO("NotificationManager: hardware initialized");
+    hwInitDone = true;
+    LOG_INFO("NotificationManager: hardware initialized in playback task");
+}
+
+void NotificationManager::playbackTask(void *param)
+{
+    QueueHandle_t queue = (QueueHandle_t)param;
+
+    // Initialize hardware in this task's context (safe for blocking I2S driver install)
+    initHardware();
+
+    NotifyEvent event;
+    while (true) {
+        // Block until a notification arrives
+        if (xQueueReceive(queue, &event, portMAX_DELAY) == pdTRUE) {
+            doNotify(event.type, event.audioOn, event.hapticOn);
+        }
+    }
+}
+
+void NotificationManager::doNotify(MessageType type, bool audioOn, bool hapticOn)
+{
+    switch (type) {
+    case TEXT_MESSAGE:
+        LOG_INFO("Notification: text message");
+#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
+        if (audioOn && i2sSpeaker) {
+            i2sSpeaker->playBeep(I2SSpeaker::BEEP_SHORT);
+        }
+#endif
+#if defined(HAS_VIBRATION_MOTOR) && defined(ARCH_ESP32)
+        if (hapticOn && vibrationMotor) {
+            vibrationMotor->pulse(50, 180);
+        }
+#endif
+        break;
+
+    case POSITION_UPDATE:
+        // Position updates are frequent - audio only, no vibration
+#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
+        if (audioOn && i2sSpeaker) {
+            i2sSpeaker->playBeep(I2SSpeaker::BEEP_DOUBLE);
+        }
+#endif
+        break;
+
+    case NODE_DISCOVERY:
+        LOG_INFO("Notification: node discovery");
+#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
+        if (audioOn && i2sSpeaker) {
+            i2sSpeaker->playBeep(I2SSpeaker::BEEP_ASCENDING);
+        }
+#endif
+#if defined(HAS_VIBRATION_MOTOR) && defined(ARCH_ESP32)
+        if (hapticOn && vibrationMotor) {
+            vibrationMotor->pattern(VibrationMotor::HAPTIC_DOUBLE);
+        }
+#endif
+        break;
+
+    case ADMIN_MESSAGE:
+        LOG_INFO("Notification: admin message");
+#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
+        if (audioOn && i2sSpeaker) {
+            i2sSpeaker->playBeep(I2SSpeaker::BEEP_ASCENDING);
+        }
+#endif
+#if defined(HAS_VIBRATION_MOTOR) && defined(ARCH_ESP32)
+        if (hapticOn && vibrationMotor) {
+            vibrationMotor->pattern(VibrationMotor::HAPTIC_DOUBLE);
+        }
+#endif
+        break;
+
+    case BATTERY_LOW:
+        LOG_WARN("Notification: battery low");
+#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
+        if (audioOn && i2sSpeaker) {
+            i2sSpeaker->playBeep(I2SSpeaker::BEEP_WARNING);
+        }
+#endif
+#if defined(HAS_VIBRATION_MOTOR) && defined(ARCH_ESP32)
+        if (hapticOn && vibrationMotor) {
+            vibrationMotor->pattern(VibrationMotor::HAPTIC_LONG);
+        }
+#endif
+        break;
+
+    case ERROR_EVENT:
+        LOG_ERROR("Notification: error");
+#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
+        if (audioOn && i2sSpeaker) {
+            i2sSpeaker->playBeep(I2SSpeaker::BEEP_WARNING);
+        }
+#endif
+#if defined(HAS_VIBRATION_MOTOR) && defined(ARCH_ESP32)
+        if (hapticOn && vibrationMotor) {
+            vibrationMotor->pattern(VibrationMotor::HAPTIC_TRIPLE);
+        }
+#endif
+        break;
+
+    case BROADCAST:
+    default:
+#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
+        if (audioOn && i2sSpeaker) {
+            i2sSpeaker->playTone(800, 80);
+        }
+#endif
+        break;
+
+    case MSG_NONE:
+        break;
+    }
+}
+
+NotificationManager::NotificationManager()
+    : MeshModule("NotificationManager"), concurrency::OSThread("NotificationMgr"), audioEnabled(true), hapticEnabled(true),
+      notifyQueue(nullptr), playbackTaskHandle(nullptr)
+{
+    isPromiscuous = true;
+
+    // Create a FreeRTOS queue for notification events (depth 4 - drop old if full)
+    notifyQueue = xQueueCreate(4, sizeof(NotifyEvent));
+    if (!notifyQueue) {
+        LOG_ERROR("NotificationManager: failed to create notification queue");
+        return;
+    }
+
+    // Create a dedicated FreeRTOS task for blocking audio/haptic playback.
+    // Stack size 4096 is sufficient for sine wave generation + I2S writes.
+    BaseType_t ret =
+        xTaskCreate(playbackTask, "notify_play", 4096, (void *)notifyQueue, 1, // Low priority
+                    &playbackTaskHandle);
+    if (ret != pdPASS) {
+        LOG_ERROR("NotificationManager: failed to create playback task");
+        vQueueDelete(notifyQueue);
+        notifyQueue = nullptr;
+        return;
+    }
+
+    LOG_INFO("NotificationManager: created with dedicated playback task");
 }
 
 bool NotificationManager::wantPacket(const meshtastic_MeshPacket *p)
 {
-    // Accept decoded packets that are not from us
     if (p->which_payload_variant == meshtastic_MeshPacket_decoded_tag) {
         switch (p->decoded.portnum) {
         case meshtastic_PortNum_TEXT_MESSAGE_APP:
@@ -77,20 +216,23 @@ bool NotificationManager::wantPacket(const meshtastic_MeshPacket *p)
 
 ProcessMessage NotificationManager::handleReceived(const meshtastic_MeshPacket &mp)
 {
-    // Don't notify for our own messages
     if (isFromUs(&mp)) {
         return ProcessMessage::CONTINUE;
     }
 
-    // Initialize hardware on first received message (lazy init)
-    if (!hardwareInitialized) {
-        initHardware();
+    if (!notifyQueue) {
+        return ProcessMessage::CONTINUE;
     }
 
-    MessageType type = classifyPacket(mp);
-    notify(type);
+    // Classify and enqueue - this returns IMMEDIATELY, no blocking
+    NotifyEvent event;
+    event.type = classifyPacket(mp);
+    event.audioOn = audioEnabled;
+    event.hapticOn = hapticEnabled;
 
-    // Always continue so other modules can also process the packet
+    // Non-blocking send: if queue is full, the notification is dropped (acceptable)
+    xQueueSend(notifyQueue, &event, 0);
+
     return ProcessMessage::CONTINUE;
 }
 
@@ -115,101 +257,6 @@ NotificationManager::MessageType NotificationManager::classifyPacket(const mesht
     }
 }
 
-void NotificationManager::notify(MessageType type)
-{
-    switch (type) {
-    case TEXT_MESSAGE:
-        LOG_INFO("NotificationManager: text message notification");
-#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
-        if (audioEnabled && i2sSpeaker) {
-            i2sSpeaker->playBeep(I2SSpeaker::BEEP_SHORT);
-        }
-#endif
-#if defined(HAS_VIBRATION_MOTOR) && defined(ARCH_ESP32)
-        if (hapticEnabled && vibrationMotor) {
-            vibrationMotor->pulse(50, 180);
-        }
-#endif
-        break;
-
-    case POSITION_UPDATE:
-        // Position updates are frequent; only audio feedback, no vibration
-        LOG_DEBUG("NotificationManager: position update notification");
-#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
-        if (audioEnabled && i2sSpeaker) {
-            i2sSpeaker->playBeep(I2SSpeaker::BEEP_DOUBLE);
-        }
-#endif
-        break;
-
-    case NODE_DISCOVERY:
-        LOG_INFO("NotificationManager: node discovery notification");
-#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
-        if (audioEnabled && i2sSpeaker) {
-            i2sSpeaker->playBeep(I2SSpeaker::BEEP_ASCENDING);
-        }
-#endif
-#if defined(HAS_VIBRATION_MOTOR) && defined(ARCH_ESP32)
-        if (hapticEnabled && vibrationMotor) {
-            vibrationMotor->pattern(VibrationMotor::HAPTIC_DOUBLE);
-        }
-#endif
-        break;
-
-    case ADMIN_MESSAGE:
-        LOG_INFO("NotificationManager: admin message notification");
-#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
-        if (audioEnabled && i2sSpeaker) {
-            i2sSpeaker->playBeep(I2SSpeaker::BEEP_ASCENDING);
-        }
-#endif
-#if defined(HAS_VIBRATION_MOTOR) && defined(ARCH_ESP32)
-        if (hapticEnabled && vibrationMotor) {
-            vibrationMotor->pattern(VibrationMotor::HAPTIC_DOUBLE);
-        }
-#endif
-        break;
-
-    case BATTERY_LOW:
-        LOG_WARN("NotificationManager: battery low notification");
-#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
-        if (audioEnabled && i2sSpeaker) {
-            i2sSpeaker->playBeep(I2SSpeaker::BEEP_WARNING);
-        }
-#endif
-#if defined(HAS_VIBRATION_MOTOR) && defined(ARCH_ESP32)
-        if (hapticEnabled && vibrationMotor) {
-            vibrationMotor->pattern(VibrationMotor::HAPTIC_LONG);
-        }
-#endif
-        break;
-
-    case ERROR_EVENT:
-        LOG_ERROR("NotificationManager: error notification");
-#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
-        if (audioEnabled && i2sSpeaker) {
-            i2sSpeaker->playBeep(I2SSpeaker::BEEP_WARNING);
-        }
-#endif
-#if defined(HAS_VIBRATION_MOTOR) && defined(ARCH_ESP32)
-        if (hapticEnabled && vibrationMotor) {
-            vibrationMotor->pattern(VibrationMotor::HAPTIC_TRIPLE);
-        }
-#endif
-        break;
-
-    case BROADCAST:
-    default:
-        LOG_DEBUG("NotificationManager: generic broadcast notification");
-#if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
-        if (audioEnabled && i2sSpeaker) {
-            i2sSpeaker->playTone(800, 80);
-        }
-#endif
-        break;
-    }
-}
-
 void NotificationManager::setVolume(uint8_t volume)
 {
 #if defined(HAS_I2S_SPEAKER) && defined(ARCH_ESP32)
@@ -221,9 +268,8 @@ void NotificationManager::setVolume(uint8_t volume)
 
 int32_t NotificationManager::runOnce()
 {
-    // The notification manager doesn't need periodic processing;
-    // notifications are triggered via handleReceived().
-    // Return max interval to minimize CPU usage.
+    // All work is done in the dedicated playback task.
+    // This OSThread does nothing - return max interval.
     return INT32_MAX;
 }
 

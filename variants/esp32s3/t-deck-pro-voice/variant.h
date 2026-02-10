@@ -60,17 +60,12 @@
 // I2S Speaker (PCM5102A DAC) - Voice variant specific
 // These GPIOs are used for the modem on the standard T-Deck Pro,
 // but repurposed for the PCM5102A I2S DAC on the Voice variant.
-#define HAS_I2S
+// NOTE: HAS_I2S is intentionally NOT defined to avoid AudioThread
+// creating a conflicting I2S driver. We use HAS_I2S_SPEAKER + I2SSpeaker instead.
 #define HAS_I2S_SPEAKER
-#define DAC_I2S_BCK 7
-#define DAC_I2S_DOUT 8
-#define DAC_I2S_WS 9
-#define DAC_I2S_MCLK -1 // PCM5102A has internal PLL, no MCLK needed
-
-// I2S speaker pin aliases for the I2SSpeaker driver
-#define I2S_SPEAKER_BCLK DAC_I2S_BCK
-#define I2S_SPEAKER_DOUT DAC_I2S_DOUT
-#define I2S_SPEAKER_LRC DAC_I2S_WS
+#define I2S_SPEAKER_BCLK 7
+#define I2S_SPEAKER_DOUT 8
+#define I2S_SPEAKER_LRC 9
 
 // Audio configuration
 #define AUDIO_SAMPLE_RATE 16000

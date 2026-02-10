@@ -12,7 +12,7 @@
 
 I2SSpeaker *i2sSpeaker = nullptr;
 
-I2SSpeaker::I2SSpeaker() : initialized(false), playing(false), currentVolume(AUDIO_DEFAULT_VOLUME), i2sPort(I2S_NUM_0) {}
+I2SSpeaker::I2SSpeaker() : initialized(false), currentVolume(AUDIO_DEFAULT_VOLUME), i2sPort(I2S_NUM_0) {}
 
 I2SSpeaker::~I2SSpeaker()
 {
@@ -74,17 +74,15 @@ void I2SSpeaker::deinit()
     i2s_zero_dma_buffer(i2sPort);
     i2s_driver_uninstall(i2sPort);
     initialized = false;
-    LOG_INFO("I2SSpeaker: deinitialized");
 }
 
 void I2SSpeaker::playTone(uint16_t freq_hz, uint16_t duration_ms)
 {
-    if (!initialized && !init()) {
+    if (!initialized) {
         return;
     }
 
     if (freq_hz < TONE_FREQ_MIN || freq_hz > TONE_FREQ_MAX) {
-        LOG_WARN("I2SSpeaker: frequency %d out of range [%d, %d]", freq_hz, TONE_FREQ_MIN, TONE_FREQ_MAX);
         return;
     }
 
@@ -92,19 +90,13 @@ void I2SSpeaker::playTone(uint16_t freq_hz, uint16_t duration_ms)
         duration_ms = TONE_DURATION_MAX_MS;
     }
 
-    playing = true;
-
-    // Brief silence at start to avoid click (ramp-up is handled in writeSineWave)
     writeSineWave(freq_hz, duration_ms);
-
-    // Brief silence at end to avoid pop
     writeSilence(5);
-
-    playing = false;
 }
 
 void I2SSpeaker::playBeep(BeepPattern pattern)
 {
+    // All delays use vTaskDelay (FreeRTOS) - safe in a dedicated task
     switch (pattern) {
     case BEEP_SHORT:
         playTone(1000, 100);
@@ -112,15 +104,15 @@ void I2SSpeaker::playBeep(BeepPattern pattern)
 
     case BEEP_DOUBLE:
         playTone(1000, 80);
-        delay(60);
+        vTaskDelay(pdMS_TO_TICKS(60));
         playTone(1000, 80);
         break;
 
     case BEEP_ASCENDING:
         playTone(800, 100);
-        delay(30);
+        vTaskDelay(pdMS_TO_TICKS(30));
         playTone(1000, 100);
-        delay(30);
+        vTaskDelay(pdMS_TO_TICKS(30));
         playTone(1200, 120);
         break;
 
@@ -143,7 +135,6 @@ void I2SSpeaker::stop()
     if (initialized) {
         i2s_zero_dma_buffer(i2sPort);
     }
-    playing = false;
 }
 
 void I2SSpeaker::writeSineWave(uint16_t freq_hz, uint16_t duration_ms)
@@ -151,11 +142,8 @@ void I2SSpeaker::writeSineWave(uint16_t freq_hz, uint16_t duration_ms)
     const uint32_t totalSamples = (uint32_t)AUDIO_SAMPLE_RATE * duration_ms / 1000;
     const float amplitude = 32767.0f * ((float)currentVolume / 100.0f);
     const float phaseIncrement = 2.0f * (float)M_PI * (float)freq_hz / (float)AUDIO_SAMPLE_RATE;
+    const uint32_t rampSamples = AUDIO_SAMPLE_RATE * 5 / 1000; // 5ms ramp to avoid clicks
 
-    // Ramp duration in samples (5ms ramp to avoid clicks)
-    const uint32_t rampSamples = AUDIO_SAMPLE_RATE * 5 / 1000;
-
-    // Write in chunks matching the DMA buffer size
     int16_t buffer[I2S_DMA_BUF_LEN];
     uint32_t samplesWritten = 0;
     float phase = 0.0f;
@@ -169,13 +157,11 @@ void I2SSpeaker::writeSineWave(uint16_t freq_hz, uint16_t duration_ms)
         for (uint32_t i = 0; i < chunkSize; i++) {
             float sample = sinf(phase) * amplitude;
 
-            // Apply ramp-up envelope at start
             uint32_t globalIdx = samplesWritten + i;
             if (globalIdx < rampSamples) {
                 sample *= (float)globalIdx / (float)rampSamples;
             }
 
-            // Apply ramp-down envelope at end
             uint32_t samplesRemaining = totalSamples - globalIdx;
             if (samplesRemaining < rampSamples) {
                 sample *= (float)samplesRemaining / (float)rampSamples;
@@ -183,15 +169,13 @@ void I2SSpeaker::writeSineWave(uint16_t freq_hz, uint16_t duration_ms)
 
             buffer[i] = (int16_t)sample;
             phase += phaseIncrement;
-
-            // Keep phase in [0, 2*PI) to avoid floating point precision loss
             if (phase >= 2.0f * (float)M_PI) {
                 phase -= 2.0f * (float)M_PI;
             }
         }
 
         size_t bytesWritten = 0;
-        i2s_write(i2sPort, buffer, chunkSize * sizeof(int16_t), &bytesWritten, portMAX_DELAY);
+        i2s_write(i2sPort, buffer, chunkSize * sizeof(int16_t), &bytesWritten, pdMS_TO_TICKS(100));
         samplesWritten += chunkSize;
     }
 }
@@ -210,7 +194,7 @@ void I2SSpeaker::writeSilence(uint16_t duration_ms)
         }
 
         size_t bytesWritten = 0;
-        i2s_write(i2sPort, buffer, chunkSize * sizeof(int16_t), &bytesWritten, portMAX_DELAY);
+        i2s_write(i2sPort, buffer, chunkSize * sizeof(int16_t), &bytesWritten, pdMS_TO_TICKS(100));
         samplesWritten += chunkSize;
     }
 }

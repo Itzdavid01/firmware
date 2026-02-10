@@ -24,7 +24,7 @@ bool VibrationMotor::init()
 #ifdef PIN_VIBRATION
     ledcSetup(PWM_CHANNEL, PWM_FREQ, PWM_RESOLUTION);
     ledcAttachPin(PIN_VIBRATION, PWM_CHANNEL);
-    ledcWrite(PWM_CHANNEL, 0); // Start with motor off
+    ledcWrite(PWM_CHANNEL, 0);
 
     initialized = true;
     LOG_INFO("VibrationMotor: initialized on GPIO %d (ch=%d, freq=%dHz)", PIN_VIBRATION, PWM_CHANNEL, PWM_FREQ);
@@ -46,17 +46,17 @@ void VibrationMotor::deinit()
     ledcDetachPin(PIN_VIBRATION);
 #endif
     initialized = false;
-    LOG_INFO("VibrationMotor: deinitialized");
 }
 
 void VibrationMotor::pulse(uint16_t duration_ms, uint8_t intensity)
 {
-    if (!initialized && !init()) {
+    if (!initialized) {
         return;
     }
 
     motorOn(intensity);
-    delay(duration_ms);
+    // Use FreeRTOS delay - safe in dedicated task, yields CPU to other tasks
+    vTaskDelay(pdMS_TO_TICKS(duration_ms));
     motorOff();
 }
 
@@ -69,7 +69,7 @@ void VibrationMotor::pattern(HapticPattern pat)
 
     case HAPTIC_DOUBLE:
         pulse(50, 200);
-        delay(80);
+        vTaskDelay(pdMS_TO_TICKS(80));
         pulse(50, 200);
         break;
 
@@ -79,9 +79,9 @@ void VibrationMotor::pattern(HapticPattern pat)
 
     case HAPTIC_TRIPLE:
         pulse(40, 200);
-        delay(60);
+        vTaskDelay(pdMS_TO_TICKS(60));
         pulse(40, 200);
-        delay(60);
+        vTaskDelay(pdMS_TO_TICKS(60));
         pulse(40, 200);
         break;
     }
