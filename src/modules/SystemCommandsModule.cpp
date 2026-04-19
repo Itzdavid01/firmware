@@ -42,6 +42,21 @@ int SystemCommandsModule::handleInputEvent(const InputEvent *event)
         IF_SCREEN(screen->decreaseBrightness());
         LOG_DEBUG("Decrease Screen Brightness");
         return 0;
+    // Read Aloud (TTS via I2S speaker)
+    case INPUT_BROKER_MSG_READ_ALOUD:
+#ifdef HAS_I2S
+        if (audioThread) {
+            const meshtastic_MeshPacket &mp = devicestate.rx_text_message;
+            if (mp.decoded.payload.size > 0) {
+                const char *msg = reinterpret_cast<const char *>(mp.decoded.payload.bytes);
+                audioThread->readAloud(msg);
+                IF_SCREEN(screen->showSimpleBanner("Reading aloud...", 2000));
+            } else {
+                IF_SCREEN(screen->showSimpleBanner("No message\nto read", 2000));
+            }
+        }
+#endif
+        return 0;
     // Mute
     case INPUT_BROKER_MSG_MUTE_TOGGLE:
         if (moduleConfig.external_notification.enabled && externalNotificationModule) {

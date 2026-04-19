@@ -52,8 +52,6 @@
 #define KB_BL_PIN 42
 
 // microphone (I2S MEMS mic on GPIO 17/18)
-// Note: GPIO 17/18 are for microphone input, not speaker output
-
 // LTR_553ALS light sensor
 #define HAS_LTR553ALS
 
@@ -97,8 +95,7 @@
 // Internally the TTGO module hooks the SX1262-DIO2 in to control the TX/RX switch (which is the default for the sx1262interface
 // code)
 
-// 4G modem pins removed - conflicts with I2S audio on Voice variant
-// Voice variant uses GPIO 7/8/9 for I2S speaker instead
+// 4G modem pins removed — conflicts with I2S audio on Voice variant
 
 #define HAS_PHYSICAL_KEYBOARD 1
 

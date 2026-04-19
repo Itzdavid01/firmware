@@ -49,7 +49,6 @@ int32_t TouchScreenBase::runOnce()
     }
 #endif
 
-    // If touch is locked, ignore all input
     if (_locked)
         return interval;
 
@@ -173,7 +172,6 @@ void TouchScreenBase::hapticFeedback()
     drv.go();
 #endif
 
-// Add a test pulse to ensure the T-Deck Pro vibration motor is working
 #if defined(PIN_VIBRATION)
     digitalWrite(PIN_VIBRATION, HIGH);
     _vibration_end = millis() + 200;

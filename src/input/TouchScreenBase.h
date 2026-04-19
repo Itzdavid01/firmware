@@ -55,8 +55,8 @@ class TouchScreenBase : public Observable<const InputEvent *>, public concurrenc
     int16_t _first_y, _last_y; // vertical swipe direction
     time_t _start;             // for LONG_PRESS
     bool _tapped;              // for DOUBLE_TAP
-    bool _locked = false;      // touch lock toggle
-    uint32_t _vibration_end = 0; // tracking haptic duration Without blocking
+    bool _locked = false;
+    uint32_t _vibration_end = 0; // non-blocking haptic duration
 
     const char *_originName;
 };

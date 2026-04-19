@@ -45,7 +45,7 @@ static unsigned char TDeckProTapMap[_TCA8418_NUM_KEYS][5] = {
     {'s', 'S', '4', 0x00, Key::LEFT},
     {'a', 'A', '*'}, // bsp, l, k, j, h, g, f, d, s, a
     {0x0d, 0x00, 0x00},
-    {'$', 0x00, 0x00, 0x00, Key::TOUCH_LOCK},  // mic key: tap='$', alt=touch lock toggle
+    {'$', Key::READ_ALOUD, 0x00, 0x00, Key::TOUCH_LOCK},  // SPEAKER key: tap='$', shift=read aloud, alt=touch lock toggle
     {'m', 'M', '.', 0x00, Key::MUTE_TOGGLE},
     {'n', 'N', ','},
     {'b', 'B', '!', 0x00, Key::BL_TOGGLE},
@@ -77,6 +77,32 @@ void TDeckProKeyboard::reset()
 // handle multi-key presses (shift and alt)
 void TDeckProKeyboard::trigger()
 {
+#if defined(PIN_VIBRATION)
+    uint32_t now = millis();
+    if (_vibration_end != 0 && now >= _vibration_end) {
+        if (_haptic_phase == 0) {
+            // single pulse: turn off
+            ::digitalWrite(PIN_VIBRATION, LOW);
+            _vibration_end = 0;
+        } else if (_haptic_phase == 1) {
+            // double pulse: gap between pulses
+            ::digitalWrite(PIN_VIBRATION, LOW);
+            _haptic_phase = 2;
+            _vibration_end = now + 20;
+        } else if (_haptic_phase == 2) {
+            // double pulse: second pulse on
+            ::digitalWrite(PIN_VIBRATION, HIGH);
+            _haptic_phase = 3;
+            _vibration_end = now + 50;
+        } else {
+            // double pulse: final off
+            ::digitalWrite(PIN_VIBRATION, LOW);
+            _haptic_phase = 0;
+            _vibration_end = 0;
+        }
+    }
+#endif
+
     uint8_t count = keyCount();
     if (count == 0)
         return;
@@ -97,16 +123,23 @@ void TDeckProKeyboard::pressed(uint8_t key)
     if (state == Init || state == Busy) {
         return;
     }
+    int row = (key - 1) / 10;
+    int col = (key - 1) % 10;
+
     if (config.device.buzzer_mode == meshtastic_Config_DeviceConfig_BuzzerMode_ALL_ENABLED ||
         config.device.buzzer_mode == meshtastic_Config_DeviceConfig_BuzzerMode_SYSTEM_ONLY) {
-        hapticFeedback();
+        uint8_t keyIdx = (row < _TCA8418_ROWS && col < _TCA8418_COLS) ? row * _TCA8418_COLS + col : UINT8_MAX;
+        bool isSpecial = false;
+        if (keyIdx < _TCA8418_NUM_KEYS) {
+            uint8_t resolvedChar = TDeckProTapMap[keyIdx][modifierFlag % TDeckProTapMod[keyIdx]];
+            isSpecial = (resolvedChar == Key::SEND_PING || resolvedChar == Key::GPS_TOGGLE ||
+                         resolvedChar == Key::READ_ALOUD);
+        }
+        hapticFeedback(isSpecial);
     }
     if (modifierFlag && (millis() - last_modifier_time > _TCA8418_MULTI_TAP_THRESHOLD)) {
         modifierFlag = 0;
     }
-
-    int row = (key - 1) / 10;
-    int col = (key - 1) % 10;
 
     if (row >= _TCA8418_ROWS || col >= _TCA8418_COLS) {
         return; // Invalid key
@@ -179,13 +212,12 @@ void TDeckProKeyboard::toggleBacklight(void)
     setBacklight(!_bl_on);
 }
 
-void TDeckProKeyboard::hapticFeedback()
+void TDeckProKeyboard::hapticFeedback(bool special)
 {
 #if defined(PIN_VIBRATION)
-    digitalWrite(PIN_VIBRATION, HIGH);
-    // Block for 200ms to allow motor to spin up
-    delay(200);
-    digitalWrite(PIN_VIBRATION, LOW);
+    ::digitalWrite(PIN_VIBRATION, HIGH);
+    _vibration_end = millis() + 50;
+    _haptic_phase = special ? 1 : 0; // 1 = start double-pulse sequence, 0 = single pulse
 #endif
 }
 

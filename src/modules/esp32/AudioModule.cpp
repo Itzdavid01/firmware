@@ -107,7 +107,7 @@ AudioModule::AudioModule() : SinglePortModule("Audio", meshtastic_PortNum_AUDIO_
         moduleConfig.audio.i2s_sck = DAC_I2S_BCK;
         moduleConfig.audio.i2s_din = DAC_I2S_DOUT;
         moduleConfig.audio.i2s_sd = 17; // MIC Data
-        moduleConfig.audio.ptt_pin = BUTTON_PIN; // GPIO 0
+        // PTT not wired — hardware I2S path is output-only on this variant
         moduleConfig.audio.bitrate = meshtastic_ModuleConfig_AudioConfig_Audio_Baud_CODEC2_700B;
     }
 #endif

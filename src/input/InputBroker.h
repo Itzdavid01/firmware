@@ -48,6 +48,7 @@ enum input_broker_event {
 #define INPUT_BROKER_MSG_TAB 0x09
 #define INPUT_BROKER_MSG_EMOTE_LIST 0x8F
 #define INPUT_BROKER_MSG_TOUCH_LOCK_TOGGLE 0xad
+#define INPUT_BROKER_MSG_READ_ALOUD 0xae
 
 typedef struct _InputEvent {
     const char *source;

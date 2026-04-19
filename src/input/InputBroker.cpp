@@ -4,6 +4,7 @@
 #include "graphics/Screen.h"
 #include "modules/ExternalNotificationModule.h"
 #include "input/TouchScreenImpl1.h"
+#include "freertosinc.h"
 
 #if ARCH_PORTDUINO
 #include "input/LinuxInputImpl.h"
@@ -123,29 +124,46 @@ int InputBroker::handleInputEvent(const InputEvent *event)
     }
 #endif
 
-    // Handle touch lock toggle
     if (event && event->kbchar == INPUT_BROKER_MSG_TOUCH_LOCK_TOGGLE) {
         if (touchScreenImpl1) {
             bool newState = !touchScreenImpl1->isLocked();
             touchScreenImpl1->setLocked(newState);
-
-            // Visual indicator: Flash the keyboard backlight
-#if defined(KB_BL_PIN)
+#if defined(KB_BL_PIN) && defined(HAS_FREE_RTOS) && !defined(ARCH_RP2040)
+            pinMode(KB_BL_PIN, OUTPUT);
+            // Run blink sequence on a short-lived task to avoid blocking event dispatch
+            struct BlinkArgs { bool doLock; uint8_t origState; };
+            auto *args = new BlinkArgs{newState, (uint8_t)digitalRead(KB_BL_PIN)};
+            xTaskCreate([](void *arg) {
+                auto *p = static_cast<BlinkArgs *>(arg);
+                bool lock = p->doLock;
+                uint8_t orig = p->origState;
+                delete p;
+                if (lock) {
+                    for (int i = 0; i < 3; i++) {
+                        digitalWrite(KB_BL_PIN, HIGH); vTaskDelay(pdMS_TO_TICKS(50));
+                        digitalWrite(KB_BL_PIN, LOW);  vTaskDelay(pdMS_TO_TICKS(50));
+                    }
+                } else {
+                    digitalWrite(KB_BL_PIN, HIGH); vTaskDelay(pdMS_TO_TICKS(150));
+                    digitalWrite(KB_BL_PIN, LOW);  vTaskDelay(pdMS_TO_TICKS(150));
+                }
+                digitalWrite(KB_BL_PIN, orig);
+                vTaskDelete(NULL);
+            }, "blinkBL", 1024, args, 1, NULL);
+#elif defined(KB_BL_PIN)
             bool origState = digitalRead(KB_BL_PIN);
             pinMode(KB_BL_PIN, OUTPUT);
             if (newState) {
-                // Locked: triple fast flutter
                 digitalWrite(KB_BL_PIN, HIGH); delay(50); digitalWrite(KB_BL_PIN, LOW); delay(50);
                 digitalWrite(KB_BL_PIN, HIGH); delay(50); digitalWrite(KB_BL_PIN, LOW); delay(50);
                 digitalWrite(KB_BL_PIN, HIGH); delay(50); digitalWrite(KB_BL_PIN, LOW); delay(50);
             } else {
-                // Unlocked: single solid flash
                 digitalWrite(KB_BL_PIN, HIGH); delay(150); digitalWrite(KB_BL_PIN, LOW); delay(150);
             }
-            digitalWrite(KB_BL_PIN, origState); // Restore original state
+            digitalWrite(KB_BL_PIN, origState);
 #endif
         }
-        return 0; // consumed, do not propagate
+        return 0;
     }
 
     this->notifyObservers(event);

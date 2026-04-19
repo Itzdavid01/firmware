@@ -604,9 +604,6 @@ void NodeDB::installDefaultConfig(bool preserveKey = false)
 
 #ifdef USERPREFS_CONFIG_LORA_REGION
     config.lora.region = USERPREFS_CONFIG_LORA_REGION;
-#elif defined(T_DECK_PRO_VOICE)
-    // Default to US region so audioPermitted = true on first boot; user can change in app
-    config.lora.region = meshtastic_Config_LoRaConfig_RegionCode_US;
 #else
     config.lora.region = meshtastic_Config_LoRaConfig_RegionCode_UNSET;
 #endif

@@ -28,6 +28,7 @@ class TCA8418KeyboardBase
         SEND_PING = 0xAF,
         BL_TOGGLE = 0xAB,
         TOUCH_LOCK = 0xAD,
+        READ_ALOUD = 0xAE,
         FUNCTION_F1 = 0xF1,
         FUNCTION_F2 = 0xF2,
         FUNCTION_F3 = 0xF3,
