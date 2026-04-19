@@ -45,7 +45,7 @@ static unsigned char TDeckProTapMap[_TCA8418_NUM_KEYS][5] = {
     {'s', 'S', '4', 0x00, Key::LEFT},
     {'a', 'A', '*'}, // bsp, l, k, j, h, g, f, d, s, a
     {0x0d, 0x00, 0x00},
-    {'$', 0x00, 0x00},
+    {'$', 0x00, 0x00, 0x00, Key::TOUCH_LOCK},  // mic key: tap='$', alt=touch lock toggle
     {'m', 'M', '.', 0x00, Key::MUTE_TOGGLE},
     {'n', 'N', ','},
     {'b', 'B', '!', 0x00, Key::BL_TOGGLE},
@@ -63,7 +63,7 @@ static unsigned char TDeckProTapMap[_TCA8418_NUM_KEYS][5] = {
 
 TDeckProKeyboard::TDeckProKeyboard()
     : TCA8418KeyboardBase(_TCA8418_ROWS, _TCA8418_COLS), modifierFlag(0), last_modifier_time(0), last_key(UINT8_MAX),
-      next_key(UINT8_MAX), last_tap(0L), char_idx(0), tap_interval(0)
+      next_key(UINT8_MAX), last_tap(0L), char_idx(0), tap_interval(0), _bl_on(false)
 {
 }
 
@@ -96,6 +96,10 @@ void TDeckProKeyboard::pressed(uint8_t key)
 {
     if (state == Init || state == Busy) {
         return;
+    }
+    if (config.device.buzzer_mode == meshtastic_Config_DeviceConfig_BuzzerMode_ALL_ENABLED ||
+        config.device.buzzer_mode == meshtastic_Config_DeviceConfig_BuzzerMode_SYSTEM_ONLY) {
+        hapticFeedback();
     }
     if (modifierFlag && (millis() - last_modifier_time > _TCA8418_MULTI_TAP_THRESHOLD)) {
         modifierFlag = 0;
@@ -162,6 +166,7 @@ void TDeckProKeyboard::released()
 
 void TDeckProKeyboard::setBacklight(bool on)
 {
+    _bl_on = on;
     if (on) {
         digitalWrite(KB_BL_PIN, HIGH);
     } else {
@@ -171,7 +176,17 @@ void TDeckProKeyboard::setBacklight(bool on)
 
 void TDeckProKeyboard::toggleBacklight(void)
 {
-    digitalWrite(KB_BL_PIN, !digitalRead(KB_BL_PIN));
+    setBacklight(!_bl_on);
+}
+
+void TDeckProKeyboard::hapticFeedback()
+{
+#if defined(PIN_VIBRATION)
+    digitalWrite(PIN_VIBRATION, HIGH);
+    // Block for 200ms to allow motor to spin up
+    delay(200);
+    digitalWrite(PIN_VIBRATION, LOW);
+#endif
 }
 
 void TDeckProKeyboard::updateModifierFlag(uint8_t key)

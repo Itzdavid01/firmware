@@ -3,6 +3,7 @@
 #include "configuration.h"
 #include "graphics/Screen.h"
 #include "modules/ExternalNotificationModule.h"
+#include "input/TouchScreenImpl1.h"
 
 #if ARCH_PORTDUINO
 #include "input/LinuxInputImpl.h"
@@ -121,6 +122,31 @@ int InputBroker::handleInputEvent(const InputEvent *event)
         return 0;
     }
 #endif
+
+    // Handle touch lock toggle
+    if (event && event->kbchar == INPUT_BROKER_MSG_TOUCH_LOCK_TOGGLE) {
+        if (touchScreenImpl1) {
+            bool newState = !touchScreenImpl1->isLocked();
+            touchScreenImpl1->setLocked(newState);
+
+            // Visual indicator: Flash the keyboard backlight
+#if defined(KB_BL_PIN)
+            bool origState = digitalRead(KB_BL_PIN);
+            pinMode(KB_BL_PIN, OUTPUT);
+            if (newState) {
+                // Locked: triple fast flutter
+                digitalWrite(KB_BL_PIN, HIGH); delay(50); digitalWrite(KB_BL_PIN, LOW); delay(50);
+                digitalWrite(KB_BL_PIN, HIGH); delay(50); digitalWrite(KB_BL_PIN, LOW); delay(50);
+                digitalWrite(KB_BL_PIN, HIGH); delay(50); digitalWrite(KB_BL_PIN, LOW); delay(50);
+            } else {
+                // Unlocked: single solid flash
+                digitalWrite(KB_BL_PIN, HIGH); delay(150); digitalWrite(KB_BL_PIN, LOW); delay(150);
+            }
+            digitalWrite(KB_BL_PIN, origState); // Restore original state
+#endif
+        }
+        return 0; // consumed, do not propagate
+    }
 
     this->notifyObservers(event);
     return 0;

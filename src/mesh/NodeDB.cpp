@@ -604,6 +604,9 @@ void NodeDB::installDefaultConfig(bool preserveKey = false)
 
 #ifdef USERPREFS_CONFIG_LORA_REGION
     config.lora.region = USERPREFS_CONFIG_LORA_REGION;
+#elif defined(T_DECK_PRO_VOICE)
+    // Default to US region so audioPermitted = true on first boot; user can change in app
+    config.lora.region = meshtastic_Config_LoRaConfig_RegionCode_US;
 #else
     config.lora.region = meshtastic_Config_LoRaConfig_RegionCode_UNSET;
 #endif
@@ -837,6 +840,8 @@ void NodeDB::installDefaultModuleConfig()
 #if defined(PIN_VIBRATION)
     moduleConfig.external_notification.output_vibra = PIN_VIBRATION;
     moduleConfig.external_notification.alert_message_vibra = true;
+    moduleConfig.external_notification.bell_vibra = true;
+    moduleConfig.external_notification.ring_vibra = true;
     moduleConfig.external_notification.output_ms = 500;
 #endif
 #if defined(LED_NOTIFICATION)
@@ -852,6 +857,7 @@ void NodeDB::installDefaultModuleConfig()
 #endif
 
 #ifdef HAS_I2S
+#ifndef T_DECK_PRO_VOICE // T_DECK_PRO_VOICE reserves I2S for codec2 voice, not notifications
     // Don't worry about the other settings for T-Watch, we'll also use the DRV2056 behavior for notifications
     moduleConfig.external_notification.enabled = true;
     moduleConfig.external_notification.use_i2s_as_buzzer = true;
@@ -862,6 +868,7 @@ void NodeDB::installDefaultModuleConfig()
 #else
     moduleConfig.external_notification.nag_timeout = default_ringtone_nag_secs;
 #endif
+#endif // !T_DECK_PRO_VOICE
 #endif
 #ifdef NANO_G2_ULTRA
     moduleConfig.external_notification.enabled = true;

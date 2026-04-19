@@ -321,6 +321,10 @@ int32_t KbI2cBase::runOnce()
                 e.inputEvent = INPUT_BROKER_ANYKEY;
                 e.kbchar = INPUT_BROKER_MSG_BLUETOOTH_TOGGLE;
                 break;
+            case TCA8418KeyboardBase::TOUCH_LOCK:
+                e.inputEvent = INPUT_BROKER_ANYKEY;
+                e.kbchar = INPUT_BROKER_MSG_TOUCH_LOCK_TOGGLE;
+                break;
             case TCA8418KeyboardBase::TAB:
                 e.inputEvent = INPUT_BROKER_ANYKEY;
                 e.kbchar = INPUT_BROKER_MSG_TAB;

@@ -100,7 +100,19 @@ AudioModule::AudioModule() : SinglePortModule("Audio", meshtastic_PortNum_AUDIO_
     // moduleConfig.audio.i2s_sck = 14;
     // moduleConfig.audio.ptt_pin = 39;
 
-    if ((moduleConfig.audio.codec2_enabled) && (myRegion->profile->audioPermitted)) {
+#ifdef T_DECK_PRO_VOICE
+    if (moduleConfig.audio.i2s_ws == 0) {
+        moduleConfig.audio.codec2_enabled = true;
+        moduleConfig.audio.i2s_ws = DAC_I2S_WS;
+        moduleConfig.audio.i2s_sck = DAC_I2S_BCK;
+        moduleConfig.audio.i2s_din = DAC_I2S_DOUT;
+        moduleConfig.audio.i2s_sd = 17; // MIC Data
+        moduleConfig.audio.ptt_pin = BUTTON_PIN; // GPIO 0
+        moduleConfig.audio.bitrate = meshtastic_ModuleConfig_AudioConfig_Audio_Baud_CODEC2_700B;
+    }
+#endif
+
+    if ((moduleConfig.audio.codec2_enabled) && (myRegion->audioPermitted)) {
         LOG_INFO("Set up codec2 in mode %u", (moduleConfig.audio.bitrate ? moduleConfig.audio.bitrate : AUDIO_MODULE_MODE) - 1);
         codec2 = codec2_create((moduleConfig.audio.bitrate ? moduleConfig.audio.bitrate : AUDIO_MODULE_MODE) - 1);
         memcpy(tx_header.magic, c2_magic, sizeof(c2_magic));

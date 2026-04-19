@@ -26,6 +26,11 @@ TouchScreenBase::TouchScreenBase(const char *name, uint16_t width, uint16_t heig
 
 void TouchScreenBase::init(bool hasTouch)
 {
+#if defined(PIN_VIBRATION)
+    pinMode(PIN_VIBRATION, OUTPUT);
+    digitalWrite(PIN_VIBRATION, LOW);
+#endif
+
     if (hasTouch) {
         LOG_INFO("TouchScreen initialized %d %d", TOUCH_THRESHOLD_X, TOUCH_THRESHOLD_Y);
         this->setInterval(100);
@@ -37,6 +42,17 @@ void TouchScreenBase::init(bool hasTouch)
 
 int32_t TouchScreenBase::runOnce()
 {
+#if defined(PIN_VIBRATION)
+    if (_vibration_end != 0 && millis() > _vibration_end) {
+        digitalWrite(PIN_VIBRATION, LOW);
+        _vibration_end = 0;
+    }
+#endif
+
+    // If touch is locked, ignore all input
+    if (_locked)
+        return interval;
+
     TouchEvent e;
     e.touchEvent = static_cast<char>(TOUCH_ACTION_NONE);
 
@@ -155,5 +171,11 @@ void TouchScreenBase::hapticFeedback()
     drv.setWaveform(0, 75);
     drv.setWaveform(1, 0); // end waveform
     drv.go();
+#endif
+
+// Add a test pulse to ensure the T-Deck Pro vibration motor is working
+#if defined(PIN_VIBRATION)
+    digitalWrite(PIN_VIBRATION, HIGH);
+    _vibration_end = millis() + 200;
 #endif
 }

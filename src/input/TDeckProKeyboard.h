@@ -11,6 +11,7 @@ class TDeckProKeyboard : public TCA8418KeyboardBase
   protected:
     void pressed(uint8_t key) override;
     void released(void) override;
+    void hapticFeedback();
 
     void updateModifierFlag(uint8_t key);
     bool isModifierKey(uint8_t key);
@@ -24,4 +25,5 @@ class TDeckProKeyboard : public TCA8418KeyboardBase
     uint32_t last_tap;
     uint8_t char_idx;
     int32_t tap_interval;
+    bool _bl_on;
 };

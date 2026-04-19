@@ -17,6 +17,11 @@ class TouchScreenBase : public Observable<const InputEvent *>, public concurrenc
   public:
     explicit TouchScreenBase(const char *name, uint16_t width, uint16_t height);
     void init(bool hasTouch);
+    bool isLocked() const { return _locked; }
+    void setLocked(bool lock) {
+        _locked = lock;
+        LOG_INFO("TouchScreen %s", lock ? "LOCKED" : "UNLOCKED");
+    }
 
   protected:
     enum TouchScreenBaseStateType { TOUCH_EVENT_OCCURRED, TOUCH_EVENT_CLEARED };
@@ -50,6 +55,8 @@ class TouchScreenBase : public Observable<const InputEvent *>, public concurrenc
     int16_t _first_y, _last_y; // vertical swipe direction
     time_t _start;             // for LONG_PRESS
     bool _tapped;              // for DOUBLE_TAP
+    bool _locked = false;      // touch lock toggle
+    uint32_t _vibration_end = 0; // tracking haptic duration Without blocking
 
     const char *_originName;
 };

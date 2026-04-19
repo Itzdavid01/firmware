@@ -31,6 +31,13 @@
 // vibration motor
 #define PIN_VIBRATION 2
 
+// I2S Speaker - PCM5102A DAC
+#define HAS_I2S
+#define DAC_I2S_BCK 7     // Bit Clock (previously MODEM_RI on 4G variant)
+#define DAC_I2S_DOUT 8    // Data Out (previously MODEM_DTR on 4G variant)
+#define DAC_I2S_WS 9      // Word Select/LRC (previously MODEM_RST on 4G variant)
+#define DAC_I2S_MCLK -1   // No master clock needed for PCM5102A
+
 // Have SPI interface SD card slot
 #define HAS_SDCARD
 #define SDCARD_USE_SPI1
@@ -44,10 +51,8 @@
 // TCA8418 keyboard
 #define KB_BL_PIN 42
 
-// microphone PCM5102A
-#define PCM5102A_SCK 47
-#define PCM5102A_DIN 17
-#define PCM5102A_LRCK 18
+// microphone (I2S MEMS mic on GPIO 17/18)
+// Note: GPIO 17/18 are for microphone input, not speaker output
 
 // LTR_553ALS light sensor
 #define HAS_LTR553ALS
@@ -92,12 +97,10 @@
 // Internally the TTGO module hooks the SX1262-DIO2 in to control the TX/RX switch (which is the default for the sx1262interface
 // code)
 
-#define MODEM_POWER_EN 41
-#define MODEM_PWRKEY 40
-#define MODEM_RST 9
-#define MODEM_RI 7
-#define MODEM_DTR 8
-#define MODEM_RX 10
-#define MODEM_TX 11
+// 4G modem pins removed - conflicts with I2S audio on Voice variant
+// Voice variant uses GPIO 7/8/9 for I2S speaker instead
 
 #define HAS_PHYSICAL_KEYBOARD 1
+
+// Bluetooth specific
+#define BLE_TX_POWER ESP_PWR_LVL_P18
