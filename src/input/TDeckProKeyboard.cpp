@@ -72,7 +72,7 @@ TDeckProKeyboard::TDeckProKeyboard()
 void TDeckProKeyboard::reset()
 {
     TCA8418KeyboardBase::reset();
-    pinMode(KB_BL_PIN, OUTPUT);
+    ::pinMode(KB_BL_PIN, OUTPUT);
     setBacklight(false);
 }
 
@@ -197,11 +197,7 @@ void TDeckProKeyboard::released()
 void TDeckProKeyboard::setBacklight(bool on)
 {
     _bl_on = on;
-    if (on) {
-        digitalWrite(KB_BL_PIN, HIGH);
-    } else {
-        digitalWrite(KB_BL_PIN, LOW);
-    }
+    ::digitalWrite(KB_BL_PIN, on ? HIGH : LOW);
 }
 
 void TDeckProKeyboard::toggleBacklight(void)

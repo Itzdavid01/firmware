@@ -22,15 +22,10 @@ void earlyInitVariant()
     digitalWrite(PIN_DRV_EN, HIGH);
 #endif
 
-    // Try other likely power pins for T-Deck Pro Voice
-    pinMode(10, OUTPUT);
-    digitalWrite(10, HIGH);
+    // Audio circuit power enable (GPIO 41 = BOARD_6609_EN)
     pinMode(41, OUTPUT);
     digitalWrite(41, HIGH);
-    pinMode(42, OUTPUT);
-    digitalWrite(42, HIGH);
-    pinMode(39, OUTPUT);
-    digitalWrite(39, HIGH);
+    // I2S MCLK — ESP32-S3 driver requires valid GPIO even though PCM5102A ignores it
     pinMode(21, OUTPUT);
     digitalWrite(21, HIGH);
 }
