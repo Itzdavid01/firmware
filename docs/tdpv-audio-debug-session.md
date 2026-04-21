@@ -1,94 +1,78 @@
-# T-Deck Pro Voice — Audio Debug Session Notes
+# T-Deck Pro Voice — Audio Debug Session
 
-## Problem
-T-Deck Pro Voice no audio output for boot melody + RTTTL buzzer despite:
-- PCM5102A DAC present on I2S pins (BCK=7, DOUT=8, WS=9)
-- `HAS_I2S` defined in variant
-- `use_i2s_as_buzzer=true` in module config
-- Haptic (DRV2605) work fine — same `playTones()` code path
-- Official Meshtastic `AudioThread.h` code (port=1, gain=0.2, no explicit `begin()`)
+## Status: RESOLVED (2026-04-21)
 
-## Hardware
-| Component | Detail |
-|-----------|--------|
-| DAC | PCM5102A I2S (BCK=7, DOUT=8, WS=9, MCLK=-1) |
-| MCU | ESP32-S3 |
-| Audio lib | `earlephilhower/ESP8266Audio@1.9.9` |
-| Variant | `esp32s3/t-deck-pro-voice` |
+Audio fully working. Boot melody plays. RTTTL tones on message receive.
 
-## What Was Tried
+---
 
-### LOG_ERROR Debugging (VERIFIED)
-Binary flashed with LOG_ERROR confirm:
-- `AudioThread: ctor ENTRY` — constructor called ✅
-- `AudioThread initOutput: BCK=7 WS=9 DOUT=8 MCLK=-1 pinResult=1 beginResult=1` — SetPinout SUCCESS ✅, begin SUCCESS ✅
-- `About to call playStartMelody` — reached ✅
-- `AudioThread beginRttl: len=34` — called with 34 chars ✅
+## Root Causes Found (all three required fixes)
 
-All init succeed. Audio no play.
+### 1. MCLK = -1 rejected by ESP32-S3 I2S driver
 
-### AudioOutputI2S begin() Call
-Tried explicit `audioOut->begin()` in `initOutput()` — no change.
+The ESP32-S3 legacy I2S driver (`i2s_check_set_mclk`) does not accept `-1` as `I2S_PIN_NO_CHANGE`. Boot log error:
 
-### Pin Assignment
-Verified against Lilygo T-Deck Pro repo:
-- BCK=7 ✅
-- WS=9 ✅
-- DOUT=8 ✅
-- MCLK=-1 ✅
-
-## Key Finding: Library Mismatch
-
-**Lilygo official T-Deck Pro demo use `esphome/ESP32-audioI2S`** (based on `schreibfaul1/ESP32-audioI2S`), NOT `ESP8266Audio`.
-
-| Library | Used by | Works with PCM5102A |
-|---------|---------|-------------------|
-| `ESP8266Audio` (Earle F. Philhower) | Meshtastic | Supposedly yes |
-| `esphome/ESP32-audioI2S` | Lilygo official demo | Yes — confirmed working in Lilygo demo |
-
-Lilygo demo code (`examples/test_pcm5102a/test_pcm5102a.ino`):
-```cpp
-Audio audio;
-audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-audio.setVolume(21);
-audio.connecttoFS(SPIFFS, "/iphone_call.mp3");
+```
+E (3119) I2S: i2s_check_set_mclk(266): mck_io_num invalid
+E (3119) I2S: i2s_set_pin(314): mclk config failed
 ```
 
-## Root Cause Hypothesis
+PCM5102A does not need MCLK (internal PLL), but the ESP32-S3 driver still requires a valid GPIO number. **Fix: `DAC_I2S_MCLK 21`** — valid spare GPIO, already set OUTPUT HIGH in `earlyInitVariant()`.
 
-`ESP8266Audio` `AudioOutputI2S` I2S timing/init sequence differ from PCM5102A DAC expect. `esphome/ESP32-audioI2S` apparently has board-specific init that work.
+Values that fail: `-1`, `39`. Use `21` (or any other valid unused GPIO).
 
-## Recommended Fix
+### 2. audioThread created after playStartMelody()
 
-1. **Switch from `ESP8266Audio` to `esphome/ESP32-audioI2S`** library
-2. Restructure `AudioThread` to use esphome `Audio` class
-3. Use `Audio::connecttoFS()` or `Audio::connecttohost()` for playback
-4. Alternative: keep `ESP8266Audio` but port esphome PCM5102A-specific init sequence
+In `src/main.cpp`, `audioThread = new AudioThread()` was located ~150 lines after `playStartMelody()`. Since `playStartMelody()` checks `audioThread != nullptr`, the boot melody was silently skipped every time.
 
-## Files Modified (Session)
+**Fix:** moved `audioThread` creation to immediately before `playStartMelody()`.
 
-| File | Change |
+### 3. SetGain(4.0) = silence (uint8_t overflow)
+
+`AudioOutput::SetGain(f)` stores: `gainF2P6 = (uint8_t)(f * 64)`.
+
+`SetGain(4.0)` → `(uint8_t)(256)` → `0` → all samples multiplied by zero → silence.
+
+**Fix:** `SetGain(3.0)` — loud without overflow. Max safe value is `3.984` (`255/64`).
+
+---
+
+## What Was Tried (chronological)
+
+| Attempt | Result |
+|---------|--------|
+| `MCLK = -1` (original POC) | Fails — ESP32-S3 driver rejects -1 |
+| `MCLK = 39` (other agent) | Fails — ESP32-S3 driver also rejects 39 |
+| `MCLK = 21` | Works — valid GPIO accepted by driver |
+| `SetGain(1.0)` | Audio confirmed working at acceptable volume |
+| `SetGain(4.0)` | Silent — uint8_t overflow to 0 |
+| `SetGain(3.0)` | Working — good volume |
+
+---
+
+## Library Notes
+
+Meshtastic uses `earlephilhower/ESP8266Audio@1.9.9`. Lilygo's official demos use `schreibfaul1/ESP32-audioI2S`. Both work with PCM5102A once pins and MCLK are correct.
+
+The library switch hypothesis (from earlier session) was **incorrect** — the actual blockers were MCLK pin and audioThread ordering, not a library incompatibility.
+
+---
+
+## Hardware Confirmed
+
+| Item | Detail |
 |------|--------|
-| `src/AudioThread.h` | Reverted to upstream (port=1, gain=0.2, no begin()) |
-| `src/main.cpp` | Moved `audioThread = new AudioThread()` before `playStartMelody()` |
-| `src/buzz/buzz.cpp` | Reordered checks so HAS_I2S path checked before buzzer_mode |
+| DAC | PCM5102A, BCK=7, DOUT=8, WS=9 |
+| MCLK | GPIO 21 (dummy output — PCM5102A uses internal PLL) |
+| Power enable | GPIO 41 HIGH (confirmed from Lilygo demo `BOARD_6609_EN`) |
+| MCU | ESP32-S3 |
+| I2S port | Port 1 (`AudioOutputI2S(1, EXTERNAL_I2S)`) |
 
-## Commands Used
-```bash
-# Build
-pio run -e t-deck-pro-voice
+---
 
-# Flash (no-reset, after killing port holder)
-python3 ~/.platformio/packages/tool-esptoolpy/esptool.py --port /dev/ttyACM0 --chip esp32s3 --baud 460800 --after no_reset write_flash 0x10000 .pio/build/t-deck-pro-voice/firmware-t-deck-pro-voice-2.7.23.d562a07.bin
+## Commits
 
-# Reboot from bootloader
-esptool.py --after hard_reset run
-
-# Capture boot serial
-python3 -c "import serial,time; s=serial.Serial('/dev/ttyACM0',115200,timeout=0.05); ..."
-```
-
-## References
-- Lilygo T-Deck Pro repo: https://github.com/Xinyuan-LilyGO/T-Deck-Pro
-- esphome/ESP32-audioI2S: https://github.com/schreibfaul1/ESP32-audioI2S
-- PCM5102A pinout: BCK=7, DOUT=8, WS=9, MCLK=-1 (from variant.h)
+| Hash | Description |
+|------|-------------|
+| `0bd3922` | Fix MCLK=21, audioThread ordering, gain 1.0 — audio working |
+| `740041d` | Fix gain 3.0 (4.0 overflows uint8_t = silence) |
