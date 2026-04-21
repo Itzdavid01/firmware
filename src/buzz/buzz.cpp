@@ -89,29 +89,29 @@ void playTonesRTTTL(const ToneDuration *tone_durations, int size)
         char noteStr[64];
         snprintf(noteStr, sizeof(noteStr), "%s,%d", note.c_str(), dur);
         strncat(rtttl, noteStr, sizeof(rtttl) - strlen(rtttl) - 1);
+    }
 
-        audioThread->beginRttl(rtttl, strlen(rtttl));
-        while (audioThread->isPlaying()) {
-            delay(10);
-        }
-        return;
+    LOG_INFO("playTonesRTTTL: size=%d rtttl='%s'", size, rtttl);
+    audioThread->beginRttl(rtttl, strlen(rtttl));
+    while (audioThread->isPlaying()) {
+        delay(10);
     }
 }
 #endif
 
 void playTones(const ToneDuration *tone_durations, int size)
 {
-    if (config.device.buzzer_mode == meshtastic_Config_DeviceConfig_BuzzerMode_DISABLED ||
-        config.device.buzzer_mode == meshtastic_Config_DeviceConfig_BuzzerMode_NOTIFICATIONS_ONLY) {
-        // Buzzer is disabled or not set to system tones
-        return;
-    }
 #ifdef HAS_I2S
+    // I2S audio is independent of buzzer_mode - check it first
     if (moduleConfig.external_notification.use_i2s_as_buzzer && audioThread) {
         playTonesRTTTL(tone_durations, size);
         return;
     }
 #endif
+    if (config.device.buzzer_mode == meshtastic_Config_DeviceConfig_BuzzerMode_DISABLED ||
+        config.device.buzzer_mode == meshtastic_Config_DeviceConfig_BuzzerMode_NOTIFICATIONS_ONLY) {
+        return;
+    }
 #if defined(PIN_BUZZER)
     if (!config.device.buzzer_gpio)
         config.device.buzzer_gpio = PIN_BUZZER;

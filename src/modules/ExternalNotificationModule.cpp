@@ -267,7 +267,8 @@ void ExternalNotificationModule::stopNow()
 #ifdef HAS_I2S
     // GPIO0 is used as mclk for I2S audio and set to OUTPUT by the sound library
     // T-Deck uses GPIO0 as trackball button, so restore the mode
-#if defined(T_DECK) || (defined(BUTTON_PIN) && BUTTON_PIN == 0)
+    // T-Deck Pro Voice also uses GPIO0 as MCLK, so exclude it from this restore
+#if defined(T_DECK) && !defined(T_DECK_PRO) || (defined(BUTTON_PIN) && BUTTON_PIN == 0 && !defined(T_DECK_PRO))
     pinMode(0, INPUT);
 #endif
 #endif
@@ -413,6 +414,11 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
             if (vibraShouldAlert) {
                 LOG_INFO("externalNotificationModule - Vibra alert");
                 setExternalState(1, true);
+#if defined(T_DECK_PRO) && defined(HAS_DRV2605)
+                drv.setWaveform(0, 16);
+                drv.setWaveform(1, 0);
+                drv.go();
+#endif
             }
 
             if (buzzerShouldAlert) {
@@ -421,7 +427,17 @@ ProcessMessage ExternalNotificationModule::handleReceived(const meshtastic_MeshP
                     LOG_INFO("Message buzzer was suppressed because buzzer mode DIRECT_MSG_ONLY");
                 } else {
                     // Buzz if buzzer mode is not in DIRECT_MSG_ONLY or is DM to us
-#ifdef HAS_DRV2605
+#if defined(T_DECK_PRO) && defined(HAS_DRV2605)
+                    drv.setWaveform(0, 16); // Long buzzer 100%
+                    drv.setWaveform(1, 0);  // Pause
+                    drv.setWaveform(2, 16);
+                    drv.setWaveform(3, 0);
+                    drv.setWaveform(4, 16);
+                    drv.setWaveform(5, 0);
+                    drv.setWaveform(6, 16);
+                    drv.setWaveform(7, 0);
+                    drv.go();
+#elif defined(HAS_DRV2605)
                     drv.setWaveform(0, 16); // Long buzzer 100%
                     drv.setWaveform(1, 0);  // Pause
                     drv.setWaveform(2, 16);

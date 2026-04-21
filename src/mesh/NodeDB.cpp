@@ -837,8 +837,7 @@ void NodeDB::installDefaultModuleConfig()
 #if defined(PIN_VIBRATION)
     moduleConfig.external_notification.output_vibra = PIN_VIBRATION;
     moduleConfig.external_notification.alert_message_vibra = true;
-    moduleConfig.external_notification.bell_vibra = true;
-    moduleConfig.external_notification.ring_vibra = true;
+    moduleConfig.external_notification.alert_bell_vibra = true;
     moduleConfig.external_notification.output_ms = 500;
 #endif
 #if defined(LED_NOTIFICATION)
@@ -854,19 +853,22 @@ void NodeDB::installDefaultModuleConfig()
 #endif
 
 #ifdef HAS_I2S
-#ifndef T_DECK_PRO_VOICE // T_DECK_PRO_VOICE reserves I2S for codec2 voice, not notifications
-    // Don't worry about the other settings for T-Watch, we'll also use the DRV2056 behavior for notifications
+    // T_DECK_PRO_VOICE uses I2S for audio notifications via PCM5102A DAC
+    // It has no codec2 voice TX, so I2S is free for buzzer use
     moduleConfig.external_notification.enabled = true;
     moduleConfig.external_notification.use_i2s_as_buzzer = true;
     moduleConfig.external_notification.alert_message_buzzer = true;
+#if defined(T_DECK_PRO_VOICE)
+    // Force buzzer to ALL_ENABLED - user might have it disabled in saved config
+    config.device.buzzer_mode = meshtastic_Config_DeviceConfig_BuzzerMode_ALL_ENABLED;
+#endif
 #if HAS_TFT
     if (moduleConfig.external_notification.nag_timeout == default_ringtone_nag_secs)
         moduleConfig.external_notification.nag_timeout = 0;
 #else
     moduleConfig.external_notification.nag_timeout = default_ringtone_nag_secs;
 #endif
-#endif // !T_DECK_PRO_VOICE
-#endif
+#endif // HAS_I2S
 #ifdef NANO_G2_ULTRA
     moduleConfig.external_notification.enabled = true;
     moduleConfig.external_notification.alert_message = true;
@@ -1440,6 +1442,35 @@ void NodeDB::loadFromDisk()
         config.network.enabled_protocols = meshtastic_Config_NetworkConfig_ProtocolFlags_UDP_BROADCAST;
     }
 
+#endif
+#if defined(T_DECK_PRO_VOICE)
+    // Force I2S buzzer enable for T-Deck Pro Voice - variant has no codec2 voice TX
+    // This runs after config is loaded, so it overrides saved configs
+    bool needSaveModule = false;
+    if (!moduleConfig.external_notification.use_i2s_as_buzzer) {
+        LOG_INFO("T_DECK_PRO_VOICE: Enabling I2S buzzer");
+        moduleConfig.external_notification.use_i2s_as_buzzer = true;
+        needSaveModule = true;
+    }
+    if (!moduleConfig.external_notification.enabled) {
+        LOG_INFO("T_DECK_PRO_VOICE: Enabling external notification module");
+        moduleConfig.external_notification.enabled = true;
+        needSaveModule = true;
+    }
+    if (!moduleConfig.external_notification.alert_message_buzzer) {
+        LOG_INFO("T_DECK_PRO_VOICE: Enabling alert_message_buzzer");
+        moduleConfig.external_notification.alert_message_buzzer = true;
+        needSaveModule = true;
+    }
+    if (needSaveModule) {
+        saveToDisk(SEGMENT_MODULECONFIG);
+    }
+    // Force buzzer mode to ALL_ENABLED if disabled
+    if (config.device.buzzer_mode == meshtastic_Config_DeviceConfig_BuzzerMode_DISABLED) {
+        LOG_INFO("T_DECK_PRO_VOICE: Enabling buzzer mode");
+        config.device.buzzer_mode = meshtastic_Config_DeviceConfig_BuzzerMode_ALL_ENABLED;
+        saveToDisk(SEGMENT_CONFIG);
+    }
 #endif
 }
 

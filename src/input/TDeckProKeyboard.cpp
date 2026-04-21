@@ -1,6 +1,8 @@
 #if defined(T_DECK_PRO)
 
 #include "TDeckProKeyboard.h"
+#include "main.h"
+#include "buzz.h"
 
 #define _TCA8418_COLS 10
 #define _TCA8418_ROWS 4
@@ -77,26 +79,22 @@ void TDeckProKeyboard::reset()
 // handle multi-key presses (shift and alt)
 void TDeckProKeyboard::trigger()
 {
-#if defined(PIN_VIBRATION)
+#if defined(HAS_DRV2605)
     uint32_t now = millis();
     if (_vibration_end != 0 && now >= _vibration_end) {
         if (_haptic_phase == 0) {
-            // single pulse: turn off
-            ::digitalWrite(PIN_VIBRATION, LOW);
+            drv.stop();
             _vibration_end = 0;
         } else if (_haptic_phase == 1) {
-            // double pulse: gap between pulses
-            ::digitalWrite(PIN_VIBRATION, LOW);
+            drv.stop();
             _haptic_phase = 2;
-            _vibration_end = now + 20;
+            _vibration_end = now + 30;
         } else if (_haptic_phase == 2) {
-            // double pulse: second pulse on
-            ::digitalWrite(PIN_VIBRATION, HIGH);
+            drv.go();
             _haptic_phase = 3;
-            _vibration_end = now + 50;
+            _vibration_end = now + 80;
         } else {
-            // double pulse: final off
-            ::digitalWrite(PIN_VIBRATION, LOW);
+            drv.stop();
             _haptic_phase = 0;
             _vibration_end = 0;
         }
@@ -123,20 +121,13 @@ void TDeckProKeyboard::pressed(uint8_t key)
     if (state == Init || state == Busy) {
         return;
     }
+    LOG_INFO("TDeckProKeyboard: keypress detected, triggering feedback");
+    hapticFeedback(false);
+    playClick();
     int row = (key - 1) / 10;
     int col = (key - 1) % 10;
+    LOG_DEBUG("TDeckPro: raw key=%u row=%d col=%d", key, row, col);
 
-    if (config.device.buzzer_mode == meshtastic_Config_DeviceConfig_BuzzerMode_ALL_ENABLED ||
-        config.device.buzzer_mode == meshtastic_Config_DeviceConfig_BuzzerMode_SYSTEM_ONLY) {
-        uint8_t keyIdx = (row < _TCA8418_ROWS && col < _TCA8418_COLS) ? row * _TCA8418_COLS + col : UINT8_MAX;
-        bool isSpecial = false;
-        if (keyIdx < _TCA8418_NUM_KEYS) {
-            uint8_t resolvedChar = TDeckProTapMap[keyIdx][modifierFlag % TDeckProTapMod[keyIdx]];
-            isSpecial = (resolvedChar == Key::SEND_PING || resolvedChar == Key::GPS_TOGGLE ||
-                         resolvedChar == Key::READ_ALOUD);
-        }
-        hapticFeedback(isSpecial);
-    }
     if (modifierFlag && (millis() - last_modifier_time > _TCA8418_MULTI_TAP_THRESHOLD)) {
         modifierFlag = 0;
     }
@@ -146,6 +137,7 @@ void TDeckProKeyboard::pressed(uint8_t key)
     }
 
     next_key = row * _TCA8418_COLS + col;
+    LOG_DEBUG("TDeckPro: next_key=%u (row=%d col=%d cols=%d)", next_key, row, col, _TCA8418_COLS);
     state = Held;
 
     uint32_t now = millis();
@@ -187,12 +179,17 @@ void TDeckProKeyboard::released()
     uint32_t now = millis();
     last_tap = now;
 
-    if (TDeckProTapMap[last_key][modifierFlag % TDeckProTapMod[last_key]] == Key::BL_TOGGLE) {
+    uint8_t mapIdx = modifierFlag % TDeckProTapMod[last_key];
+    uint8_t action = TDeckProTapMap[last_key][mapIdx];
+    LOG_DEBUG("TDeckPro: released last_key=%u modifierFlag=%u mapIdx=%u action=0x%02x", last_key, modifierFlag, mapIdx, action);
+
+    if (action == Key::BL_TOGGLE) {
+        LOG_INFO("TDeckPro: toggling backlight");
         toggleBacklight();
         return;
     }
 
-    queueEvent(TDeckProTapMap[last_key][modifierFlag % TDeckProTapMod[last_key]]);
+    queueEvent(action);
     if (isModifierKey(last_key) == false)
         modifierFlag = 0;
 }
@@ -214,10 +211,15 @@ void TDeckProKeyboard::toggleBacklight(void)
 
 void TDeckProKeyboard::hapticFeedback(bool special)
 {
-#if defined(PIN_VIBRATION)
-    ::digitalWrite(PIN_VIBRATION, HIGH);
-    _vibration_end = millis() + 50;
-    _haptic_phase = special ? 1 : 0; // 1 = start double-pulse sequence, 0 = single pulse
+#if defined(HAS_DRV2605)
+    _vibration_end = millis() + (special ? 160 : 120);
+    _haptic_phase = 1;
+    drv.setWaveform(0, 16);
+    drv.setWaveform(1, 0);
+    drv.setWaveform(2, 16);
+    drv.setWaveform(3, 0);
+    drv.setWaveform(4, 0);
+    drv.go();
 #endif
 }
 
@@ -225,12 +227,16 @@ void TDeckProKeyboard::updateModifierFlag(uint8_t key)
 {
     if (key == modifierRightShiftKey) {
         modifierFlag ^= modifierRightShift;
+        LOG_DEBUG("TDeckPro: RShift modifierFlag=%u", modifierFlag);
     } else if (key == modifierLeftShiftKey) {
         modifierFlag ^= modifierLeftShift;
+        LOG_DEBUG("TDeckPro: LShift modifierFlag=%u", modifierFlag);
     } else if (key == modifierSymKey) {
         modifierFlag ^= modifierSym;
+        LOG_DEBUG("TDeckPro: Sym modifierFlag=%u", modifierFlag);
     } else if (key == modifierAltKey) {
         modifierFlag ^= modifierAlt;
+        LOG_DEBUG("TDeckPro: Alt modifierFlag=%u", modifierFlag);
     }
 }
 

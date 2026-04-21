@@ -8,6 +8,26 @@ This repository is the [Meshtastic](https://meshtastic.org) firmware — a C++17
 
 This file (`AGENTS.md`) is a short pointer + quick reference for agents that don't read `.github/copilot-instructions.md` by default.
 
+## Entry points
+
+- **src/main.cpp** — `setup()` at line 308, `loop()` at line 1242
+- **Boot sequence**: `waitUntilPowerLevelSafe()` → `earlyInitVariant()` [weak hook] → I2C scan (80+ devices) → `setupModules()` → `initLoRa()` → `lateInitVariant()` [weak hook]
+- **Platform setup delegates**: `esp32Setup()`, `nrf52Setup()`, `rp2040Setup()` in `src/platform/<arch>/`
+
+## Concurrency / Threading
+
+- **OSThread pattern**: 26+ modules inherit from it via `class X : public ProtobufModule<Msg>, private concurrency::OSThread`
+- **runOnce()** returns ms-to-next-run (≤0 = sleep, `RUN_SAME` = -1 for immediate reschedule)
+- **Lock ordering**: `cryptLock` → `nodeInfoMutex` → `streamLock` (never reverse to avoid deadlock)
+- **SPILock** for radio SPI access
+
+## Anti-patterns (don't do this)
+
+- **NEVER** use Arduino `String` type for packet payloads (heap fragmentation on embedded targets)
+- **ALWAYS** `memset` protobuf structs before `decode` (nanopb leaves unset fields uninitialized)
+- **NEVER** hold `nodeInfoMutex` across blocking I/O (causes NimBLE deadlock)
+- **ALWAYS** use `allocForSending()` / `release()` for packet memory management
+
 ## Quick command reference
 
 | Action                           | Command                                                                             |
@@ -21,6 +41,14 @@ This file (`AGENTS.md`) is a short pointer + quick reference for agents that don
 | Format before commit             | `trunk fmt`                                                                         |
 | Regenerate protobuf bindings     | `bin/regen-protos.sh`                                                               |
 | Generate CI matrix               | `./bin/generate_ci_matrix.py all [--level pr]`                                      |
+
+### Build system notes
+
+- No Makefile — build via PlatformIO + shell scripts in `bin/`
+- `userPrefs.jsonc` parsed at build time → `-D` flags (compile-time config)
+- Every build produces `*.mt.json` manifest with MD5 checksums
+- `version.properties` is version source (not git tags)
+- **Format before commit**: `trunk fmt` — the CI `trunk_check` gate rejects unformatted code
 
 ## MCP server (device + test automation)
 
@@ -90,6 +118,12 @@ Sequence these; don't parallelize on the same port.
 4. On failure, open `mcp-server/tests/report.html` → `Meshtastic debug` section for the firmware log tail + device state dump
 5. Iterate
 
+### Test infrastructure
+
+- **Native tests**: Unity framework, `pio test -e native` (12+ test suites in `test/`)
+- **MCP tests**: pytest hardware integration tests, `./mcp-server/run-tests.sh`
+- **test_00_bake.py**: flashes devices at session start with test profile
+
 ### Debugging a flaky test
 
 1. `/repro <test-node-id> [count]` — re-runs the test N times, diffs firmware logs between passes and failures
@@ -102,10 +136,14 @@ Sequence these; don't parallelize on the same port.
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `src/`                            | Firmware C++ source (`mesh/`, `modules/`, `platform/`, `graphics/`, `gps/`, `motion/`, `mqtt/`, …)                       |
 | `src/mesh/`                       | Core: NodeDB, Router, Channels, CryptoEngine, radio interfaces, StreamAPI, PhoneAPI                                      |
+| `src/mesh/NodeDB.cpp`             | Node database, key management (2,343 lines)                                                                              |
+| `src/graphics/Screen.cpp`         | Display driver abstraction (2,058 lines)                                                                                 |
+| `src/modules/CannedMessageModule.cpp` | Pre-defined messages (2,376 lines)                                                                                   |
+| `src/modules/AdminModule.cpp`     | Remote admin (1,599 lines)                                                                                               |
 | `src/modules/`                    | Feature modules; `Telemetry/Sensor/` has 50+ I2C sensor drivers                                                          |
 | `variants/`                       | 200+ hardware variant definitions (`variant.h` + `platformio.ini` per board)                                             |
 | `protobufs/`                      | `.proto` definitions; regenerate with `bin/regen-protos.sh`                                                              |
-| `test/`                           | Firmware unit tests (12 suites; `pio test -e native`)                                                                    |
+| `test/`                           | Firmware unit tests (Unity framework; `pio test -e native`)                                                                |
 | `mcp-server/`                     | Python MCP server + pytest hardware integration tests                                                                    |
 | `mcp-server/tests/`               | Tiered pytest suite: `unit/`, `mesh/`, `telemetry/`, `monitor/`, `recovery/`, `ui/`, `fleet/`, `admin/`, `provisioning/` |
 | `.claude/commands/`               | Claude Code slash command bodies                                                                                         |

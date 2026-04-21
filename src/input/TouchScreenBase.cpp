@@ -166,13 +166,13 @@ int32_t TouchScreenBase::runOnce()
 
 void TouchScreenBase::hapticFeedback()
 {
-#ifdef T_WATCH_S3
-    drv.setWaveform(0, 75);
-    drv.setWaveform(1, 0); // end waveform
+#if defined(T_WATCH_S3) || defined(T_DECK_PRO)
+    drv.setWaveform(0, 16);
+    drv.setWaveform(1, 0);
     drv.go();
 #endif
 
-#if defined(PIN_VIBRATION)
+#if defined(PIN_VIBRATION) && !defined(T_DECK_PRO)
     digitalWrite(PIN_VIBRATION, HIGH);
     _vibration_end = millis() + 200;
 #endif

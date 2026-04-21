@@ -26,6 +26,6 @@ class TDeckProKeyboard : public TCA8418KeyboardBase
     uint8_t char_idx;
     int32_t tap_interval;
     bool _bl_on;
-    uint32_t _vibration_end = 0; // millis() timestamp when vibration should stop
-    uint8_t _haptic_phase = 0;   // 0=single-pulse, 1=double-pulse-on1, 2=gap, 3=double-pulse-on2
+    uint32_t _vibration_end = 0;
+    uint8_t _haptic_phase = 0;
 };

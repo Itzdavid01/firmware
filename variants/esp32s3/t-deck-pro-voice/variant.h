@@ -28,15 +28,16 @@
 
 #define BUTTON_PIN 0
 
-// vibration motor
-#define PIN_VIBRATION 2
+// DRV2605 haptic controller at I2C 0x5a
+#define HAS_DRV2605
+#define PIN_DRV_EN 2
 
 // I2S Speaker - PCM5102A DAC
 #define HAS_I2S
 #define DAC_I2S_BCK 7     // Bit Clock (previously MODEM_RI on 4G variant)
 #define DAC_I2S_DOUT 8    // Data Out (previously MODEM_DTR on 4G variant)
 #define DAC_I2S_WS 9      // Word Select/LRC (previously MODEM_RST on 4G variant)
-#define DAC_I2S_MCLK -1   // No master clock needed for PCM5102A
+#define DAC_I2S_MCLK 21   // ESP32-S3 I2S driver needs valid GPIO for MCLK even if PCM5102A ignores it
 
 // Have SPI interface SD card slot
 #define HAS_SDCARD
