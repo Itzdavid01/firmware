@@ -122,7 +122,6 @@ void TDeckProKeyboard::pressed(uint8_t key)
         return;
     }
     LOG_INFO("TDeckProKeyboard: keypress detected, triggering feedback");
-    hapticFeedback(false);
     playClick();
     int row = (key - 1) / 10;
     int col = (key - 1) % 10;
