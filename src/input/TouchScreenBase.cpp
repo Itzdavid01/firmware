@@ -167,7 +167,7 @@ int32_t TouchScreenBase::runOnce()
 void TouchScreenBase::hapticFeedback()
 {
 #if defined(T_WATCH_S3) || defined(T_DECK_PRO)
-    drv.setWaveform(0, 16);
+    drv.setWaveform(0, 1); // Strong Click 100% (~5ms) — was 16 (Long Buzzer, ~1s)
     drv.setWaveform(1, 0);
     drv.go();
 #endif
