@@ -4,6 +4,12 @@ pio.tar
 web
 web.tar
 docs/
+CLAUDE.md
+CLAUDE.original.md
+.sisyphus/
+AGENTS.md
+**/AGENTS.md
+*.original.md
 
 # ignore vscode IDE settings files
 .vscode/*
