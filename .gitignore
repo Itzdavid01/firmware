@@ -3,6 +3,7 @@ pio
 pio.tar
 web
 web.tar
+docs/
 
 # ignore vscode IDE settings files
 .vscode/*
