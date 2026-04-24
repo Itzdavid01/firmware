@@ -1596,15 +1596,20 @@ class LipoCharger : public HasBatteryLevel
      */
     virtual int getBatteryPercent() override
     {
-        return -1;
-        // return bq->getChargePercent(); // don't use BQ27220 for battery percent,
-        // it is not calibrated
+        if (bq == nullptr)
+            return -1;
+        return bq->getChargePercent();
     }
 
     /**
      * The raw voltage of the battery in millivolts, or NAN if unknown
      */
-    virtual uint16_t getBattVoltage() override { return bq->getVoltage(); }
+    virtual uint16_t getBattVoltage() override
+    {
+        if (bq != nullptr)
+            return bq->getVoltage();
+        return PPM ? PPM->getBattVoltage() : 0;
+    }
 
     /**
      * return true if there is a battery installed in this unit
