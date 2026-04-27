@@ -34,10 +34,10 @@
 
 // I2S Speaker - PCM5102A DAC
 #define HAS_I2S
-#define DAC_I2S_BCK 7     // Bit Clock (previously MODEM_RI on 4G variant)
-#define DAC_I2S_DOUT 8    // Data Out (previously MODEM_DTR on 4G variant)
-#define DAC_I2S_WS 9      // Word Select/LRC (previously MODEM_RST on 4G variant)
-#define DAC_I2S_MCLK 21   // ESP32-S3 I2S driver needs valid GPIO for MCLK even if PCM5102A ignores it
+#define DAC_I2S_BCK 7   // Bit Clock (previously MODEM_RI on 4G variant)
+#define DAC_I2S_DOUT 8  // Data Out (previously MODEM_DTR on 4G variant)
+#define DAC_I2S_WS 9    // Word Select/LRC (previously MODEM_RST on 4G variant)
+#define DAC_I2S_MCLK 21 // ESP32-S3 I2S driver needs valid GPIO for MCLK even if PCM5102A ignores it
 
 // Have SPI interface SD card slot
 #define HAS_SDCARD

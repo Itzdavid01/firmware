@@ -18,7 +18,8 @@ class TouchScreenBase : public Observable<const InputEvent *>, public concurrenc
     explicit TouchScreenBase(const char *name, uint16_t width, uint16_t height);
     void init(bool hasTouch);
     bool isLocked() const { return _locked; }
-    void setLocked(bool lock) {
+    void setLocked(bool lock)
+    {
         _locked = lock;
         LOG_INFO("TouchScreen %s", lock ? "LOCKED" : "UNLOCKED");
     }

@@ -1,8 +1,8 @@
 #if defined(T_DECK_PRO)
 
 #include "TDeckProKeyboard.h"
-#include "main.h"
 #include "buzz.h"
+#include "main.h"
 
 #define _TCA8418_COLS 10
 #define _TCA8418_ROWS 4
@@ -47,7 +47,7 @@ static unsigned char TDeckProTapMap[_TCA8418_NUM_KEYS][5] = {
     {'s', 'S', '4', 0x00, Key::LEFT},
     {'a', 'A', '*'}, // bsp, l, k, j, h, g, f, d, s, a
     {0x0d, 0x00, 0x00},
-    {'$', Key::READ_ALOUD, 0x00, 0x00, Key::TOUCH_LOCK},  // SPEAKER key: tap='$', shift=read aloud, alt=touch lock toggle
+    {'$', Key::READ_ALOUD, 0x00, 0x00, Key::TOUCH_LOCK}, // SPEAKER key: tap='$', shift=read aloud, alt=touch lock toggle
     {'m', 'M', '.', 0x00, Key::MUTE_TOGGLE},
     {'n', 'N', ','},
     {'b', 'B', '!', 0x00, Key::BL_TOGGLE},
