@@ -34,26 +34,19 @@ Different NicheGraphics UIs and different hardware variants will each have their
 // Shared NicheGraphics components
 // --------------------------------
 #include "graphics/niche/Drivers/Backlight/LatchingBacklight.h"
-#include "graphics/niche/Drivers/EInk/DEPG0290BNS800.h"
+#include "graphics/niche/Drivers/EInk/ED047TC1Parallel.h"
 #include "graphics/niche/Inputs/TwoButton.h"
 
 void setupNicheGraphics()
 {
     using namespace NicheGraphics;
 
-    // SPI
-    // -----------------------------
-
-    // Display is connected to HSPI
-    SPIClass *hspi = new SPIClass(HSPI);
-    hspi->begin(PIN_EINK_SCLK, -1, PIN_EINK_MOSI, PIN_EINK_CS);
-
     // E-Ink Driver
     // -----------------------------
 
     // Use E-Ink driver
-    Drivers::EInk *driver = new Drivers::DEPG0290BNS800;
-    driver->begin(hspi, PIN_EINK_DC, PIN_EINK_CS, PIN_EINK_BUSY);
+    Drivers::EInk *driver = new Drivers::ED047TC1Parallel;
+    driver->begin(nullptr, -1, -1, -1); // Parallel driver doesn't need SPI/DC/CS/BUSY here
 
     // InkHUD
     // ----------------------------
@@ -72,16 +65,18 @@ void setupNicheGraphics()
     InkHUD::Applet::fontSmall = FREESANS_6PT_WIN1252;
 
     // Init settings, and customize defaults
-    inkhud->persistence->settings.userTiles.maxCount = 2; // How many tiles can the display handle?
-    inkhud->persistence->settings.rotation = 1;           // 90 degrees clockwise
-    inkhud->persistence->settings.userTiles.count = 1;    // One tile only by default, keep things simple for new users
-    inkhud->persistence->settings.optionalMenuItems.nextTile = false;  // Behavior handled by aux button instead
-    inkhud->persistence->settings.optionalFeatures.batteryIcon = true; // Device definitely has a battery
+    inkhud->persistence->settings.userTiles.maxCount = 4; // T5S3 Pro has a big screen!
+    inkhud->persistence->settings.rotation = 3;           // 270 degrees clockwise (fix upside down)
+    inkhud->persistence->settings.userTiles.count = 2;    // Two tiles by default
+    inkhud->persistence->settings.optionalMenuItems.nextTile = true;
+    inkhud->persistence->settings.optionalFeatures.batteryIcon = true;
 
     // Setup backlight
-    // Note: AUX button behavior configured further down
     Drivers::LatchingBacklight *backlight = Drivers::LatchingBacklight::getInstance();
-    backlight->setPin(PIN_EINK_EN);
+    backlight->setPin(BOARD_BL_EN);
+    if (uiconfig.screen_brightness > 0) {
+        backlight->latch();
+    }
 
     // Pick applets
     // Note: order of applets determines priority of "auto-show" feature
@@ -112,10 +107,12 @@ void setupNicheGraphics()
     buttons->setHandlerShortPress(0, []() { InkHUD::InkHUD::getInstance()->shortpress(); });
     buttons->setHandlerLongPress(0, []() { InkHUD::InkHUD::getInstance()->longpress(); });
 
+#if defined(T5_S3_EPAPER_PRO_V1)
     // Setup the aux button (1)
-    // Bonus feature of VME290
-    buttons->setWiring(1, BUTTON_PIN_SECONDARY);
+    // V1 has two buttons
+    buttons->setWiring(1, PIN_BUTTON2);
     buttons->setHandlerShortPress(1, []() { InkHUD::InkHUD::getInstance()->nextTile(); });
+#endif
 
     buttons->start();
 }

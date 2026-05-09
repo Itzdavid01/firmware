@@ -1,4 +1,5 @@
 #include "InputBroker.h"
+#include "PCA9535ButtonThread.h"
 #include "PowerFSM.h" // needed for event trigger
 #include "configuration.h"
 #include "graphics/Screen.h"
@@ -45,7 +46,7 @@ ButtonThread *UserButtonThread = nullptr;
 #endif
 
 #if defined(ALT_BUTTON_PIN)
-ButtonThread *BackButtonThread = nullptr;
+ButtonThread *TouchButtonThread = nullptr;
 #endif
 
 #if defined(CANCEL_BUTTON_PIN)
@@ -402,5 +403,9 @@ void InputBroker::Init()
 #endif
 #ifdef INPUTBROKER_EXPRESSLRSFIVEWAY_TYPE
     expressLRSFiveWayInput = new ExpressLRSFiveWay();
+#endif
+#if defined(T5_S3_EPAPER_PRO_V2)
+    pca9535Buttons = new PCA9535ButtonThread();
+    inputEventObserver.observe(pca9535Buttons);
 #endif
 }

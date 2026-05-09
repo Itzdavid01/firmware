@@ -39,6 +39,8 @@ class EInkParallelDisplay : public OLEDDisplay
   protected:
     uint32_t lastDrawMsec = 0;
     FASTEPD *epaper;
+    uint16_t panelWidth = 0;
+    uint16_t panelHeight = 0;
 
   private:
     // Async full-refresh support

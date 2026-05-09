@@ -2,6 +2,7 @@
 // Display (E-Ink) ED047TC1 - 8bit parallel
 #define EPD_WIDTH 960
 #define EPD_HEIGHT 540
+#define EPD_PADDING 24
 
 #define CANNED_MESSAGE_MODULE_ENABLE 1
 #define USE_VIRTUAL_KEYBOARD 1
@@ -44,13 +45,14 @@
 #define PIN_BUTTON2 0
 #define ALT_BUTTON_PIN PIN_BUTTON2
 #else
+// V2: User/BOOT=GPIO0, RST=hardware reset
 #define BUTTON_PIN 0
 #endif
 
 // SD card
 #define HAS_SDCARD
 #define SDCARD_CS SPI_CS
-#define SD_SPI_FREQUENCY 75000000U
+#define SD_SPI_FREQUENCY 20000000U
 
 // battery charger BQ25896
 #define HAS_PPM 1

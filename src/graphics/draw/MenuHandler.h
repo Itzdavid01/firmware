@@ -111,9 +111,9 @@ class menuHandler
     static void displayUnitsMenu();
     static void messageBubblesMenu();
     static void textMessageMenu();
+    static void saveUIConfig();
 
   private:
-    static void saveUIConfig();
     static void keyVerificationInitMenu();
     static void keyVerificationFinalPrompt();
     static void bluetoothToggleMenu();

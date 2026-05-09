@@ -4,7 +4,9 @@ This repository is the [Meshtastic](https://meshtastic.org) firmware — a C++17
 
 ## Primary instruction file
 
-**Read `.github/copilot-instructions.md` first.** That file is the canonical agent-facing document for this repo. It covers project layout, coding conventions (naming, module framework, Observer pattern, thread safety), the build system, CI/CD, the native C++ test suite, and — most importantly for automation work — the **MCP Server & Hardware Test Harness** section. Read it top-to-bottom before starting any non-trivial change.
+**Read .github/copilot-instructions.md first.** That file is the canonical agent-facing document for this repo. It covers project layout, coding conventions (naming, module framework, Observer pattern, thread safety), the build system, CI/CD, the native C++ test suite, and — most importantly for automation work — the **MCP Server & Hardware Test Harness** section. Read it top-to-bottom before starting any non-trivial change.
+
+See **`docs/T5S3_EREADER_ROADMAP.md`** for the current status of the E-Reader POC and planned performance improvements.
 
 This file (`AGENTS.md`) is a short pointer + quick reference for agents that don't read `.github/copilot-instructions.md` by default.
 

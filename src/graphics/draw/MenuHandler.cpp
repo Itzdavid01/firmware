@@ -4,6 +4,9 @@
 #include "Default.h"
 #include "GPS.h"
 #include "MenuHandler.h"
+#ifdef HAS_READER
+#include "reader/ReaderFSM.h"
+#endif
 #include "MeshRadio.h"
 #include "MeshService.h"
 #include "MessageStore.h"
@@ -966,26 +969,7 @@ void menuHandler::homeBaseMenu()
                 IF_SCREEN(if (!externalNotificationModule->getMute()) externalNotificationModule->stopNow();)
             }
         } else if (selected == Backlight) {
-            screen->setOn(false);
-#if defined(PIN_EINK_EN)
-            if (uiconfig.screen_brightness == 1) {
-                uiconfig.screen_brightness = 0;
-                digitalWrite(PIN_EINK_EN, LOW);
-            } else {
-                uiconfig.screen_brightness = 1;
-                digitalWrite(PIN_EINK_EN, HIGH);
-            }
-            saveUIConfig();
-#elif defined(PCA_PIN_EINK_EN)
-            if (uiconfig.screen_brightness > 0) {
-                uiconfig.screen_brightness = 0;
-                io.digitalWrite(PCA_PIN_EINK_EN, LOW);
-            } else {
-                uiconfig.screen_brightness = 1;
-                io.digitalWrite(PCA_PIN_EINK_EN, HIGH);
-            }
-            saveUIConfig();
-#endif
+            screen->toggleBacklight();
         } else if (selected == Sleep) {
             screen->setOn(false);
         } else if (selected == Position) {
@@ -1040,7 +1024,7 @@ void menuHandler::textMessageBaseMenu()
 
 void menuHandler::systemBaseMenu()
 {
-    enum optionsNumbers { Back, Notifications, ScreenOptions, Bluetooth, WiFiToggle, PowerMenu, Test, enumEnd };
+    enum optionsNumbers { Back, Notifications, ScreenOptions, Bluetooth, WiFiToggle, PowerMenu, Test, EReader, enumEnd };
     static const char *optionsArray[enumEnd] = {"Back"};
     static int optionsEnumArray[enumEnd] = {Back};
     int options = 1;
@@ -1050,6 +1034,11 @@ void menuHandler::systemBaseMenu()
 
     optionsArray[options] = "Display Options";
     optionsEnumArray[options++] = ScreenOptions;
+
+#ifdef HAS_READER
+    optionsArray[options] = "E-Reader";
+    optionsEnumArray[options++] = EReader;
+#endif
 
     if (currentResolution == ScreenResolution::UltraLow) {
         optionsArray[options] = "Bluetooth";
@@ -1102,6 +1091,10 @@ void menuHandler::systemBaseMenu()
         } else if (selected == WiFiToggle) {
             menuQueue = WifiToggleMenu;
             screen->runNow();
+#endif
+#ifdef HAS_READER
+        } else if (selected == EReader) {
+            reader::ReaderFSM::getInstance()->launch();
 #endif
         } else if (selected == Back && !test_enabled) {
             test_count++;

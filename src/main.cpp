@@ -156,6 +156,10 @@ void setupNicheGraphics();
 #include "nicheGraphics.h"
 #endif
 
+#ifdef HAS_READER
+#include "reader/ReaderFSM.h"
+#endif
+
 #if defined(HW_SPI1_DEVICE) && defined(ARCH_ESP32)
 SPIClass SPI1(HSPI);
 #endif
@@ -1053,6 +1057,10 @@ void setup()
 #ifdef MESHTASTIC_INCLUDE_NICHE_GRAPHICS
     // After modules are setup, so we can observe modules
     setupNicheGraphics();
+#endif
+
+#ifdef HAS_READER
+    reader::ReaderFSM::getInstance()->init();
 #endif
 
 // Do this after service.init (because that clears error_code)

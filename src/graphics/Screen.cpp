@@ -56,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "graphics/SharedUIDisplay.h"
 #include "graphics/emotes.h"
 #include "graphics/images.h"
+#include "input/PCA9535ButtonThread.h"
 #include "input/TouchScreenImpl1.h"
 #include "main.h"
 #include "mesh-pb-constants.h"
@@ -451,7 +452,7 @@ Screen::Screen(ScanI2C::DeviceAddress address, meshtastic_Config_DisplayConfig_O
     dispdev = new EInkDynamicDisplay(address.address, -1, -1, geometry,
                                      (address.port == ScanI2C::I2CPort::WIRE1) ? HW_I2C::I2C_TWO : HW_I2C::I2C_ONE);
 #elif defined(USE_EINK_PARALLELDISPLAY)
-    dispdev = new EInkParallelDisplay(EPD_WIDTH, EPD_HEIGHT, EInkParallelDisplay::EPD_ROT_PORTRAIT);
+    dispdev = new EInkParallelDisplay(EPD_WIDTH, EPD_HEIGHT, EInkParallelDisplay::EPD_ROT_INVERTED_PORTRAIT);
 #elif defined(USE_ST7567)
     dispdev = new ST7567Wire(address.address, -1, -1, geometry,
                              (address.port == ScanI2C::I2CPort::WIRE1) ? HW_I2C::I2C_TWO : HW_I2C::I2C_ONE);
@@ -547,6 +548,20 @@ void Screen::handleSetOn(bool on, FrameCallback einkScreensaver)
 #if defined(HELTEC_TRACKER_V1_X) || defined(HELTEC_WIRELESS_TRACKER_V2)
             ui->init();
 #endif
+#if defined(BOARD_BL_EN)
+            // Stop toggling BOARD_BL_EN in BaseUI, it's actually EPD power
+            // digitalWrite(BOARD_BL_EN, (uiconfig.screen_brightness > 0) ? HIGH : LOW);
+#ifdef MESHTASTIC_INCLUDE_NICHE_GRAPHICS
+            if (uiconfig.screen_brightness > 0)
+                NicheGraphics::Drivers::LatchingBacklight::getInstance()->latch();
+            else
+                NicheGraphics::Drivers::LatchingBacklight::getInstance()->off();
+#endif
+#if defined(T5_S3_EPAPER_PRO_V2)
+            if (pca9535Buttons)
+                pca9535Buttons->setBacklight(uiconfig.screen_brightness > 0);
+#endif
+#endif
 #if defined(USE_ST7789) && defined(VTFT_LEDA)
 #ifdef VTFT_CTRL
             pinMode(VTFT_CTRL, OUTPUT);
@@ -583,6 +598,19 @@ void Screen::handleSetOn(bool on, FrameCallback einkScreensaver)
             digitalWrite(PIN_EINK_EN, LOW);
 #elif defined(PCA_PIN_EINK_EN)
             io.digitalWrite(PCA_PIN_EINK_EN, LOW);
+#endif
+
+#if defined(BOARD_BL_EN)
+            // Stop toggling BOARD_BL_EN in BaseUI, it's actually EPD power
+            // digitalWrite(BOARD_BL_EN, LOW);
+#ifdef MESHTASTIC_INCLUDE_NICHE_GRAPHICS
+            NicheGraphics::Drivers::LatchingBacklight::getInstance()->off();
+#endif
+#if defined(T5_S3_EPAPER_PRO_V2)
+            // For T5S3 Pro, only turn off backlight if brightness is 0 OR we are going to deep sleep
+            if (pca9535Buttons && (uiconfig.screen_brightness == 0 || einkScreensaver != NULL))
+                pca9535Buttons->setBacklight(false);
+#endif
 #endif
 
             dispdev->displayOff();
@@ -677,6 +705,17 @@ void Screen::setup()
 
     // Initialize display and UI system
     ui->init();
+
+#if defined(BOARD_BL_EN)
+    pinMode(BOARD_BL_EN, OUTPUT);
+#if defined(T5_S3_EPAPER_PRO_V2)
+    if (pca9535Buttons)
+        pca9535Buttons->setBacklight(uiconfig.screen_brightness > 0);
+#else
+    digitalWrite(BOARD_BL_EN, (uiconfig.screen_brightness > 0) ? HIGH : LOW);
+#endif
+#endif
+
     displayWidth = dispdev->width();
     displayHeight = dispdev->height();
 
@@ -1504,6 +1543,36 @@ void Screen::decreaseBrightness()
     /* TO DO: add little popup in center of screen saying what brightness level it is set to*/
 }
 
+void Screen::toggleBacklight()
+{
+    uiconfig.screen_brightness = (uiconfig.screen_brightness > 0) ? 0 : 1;
+#if defined(BOARD_BL_EN)
+#if defined(T5_S3_EPAPER_PRO_V2)
+    if (pca9535Buttons)
+        pca9535Buttons->setBacklight(uiconfig.screen_brightness > 0);
+#else
+    digitalWrite(BOARD_BL_EN, (uiconfig.screen_brightness > 0) ? HIGH : LOW);
+#endif
+#elif defined(PIN_EINK_EN)
+    digitalWrite(PIN_EINK_EN, (uiconfig.screen_brightness > 0) ? HIGH : LOW);
+#elif defined(PCA_PIN_EINK_EN)
+    io.digitalWrite(PCA_PIN_EINK_EN, (uiconfig.screen_brightness > 0) ? HIGH : LOW);
+#endif
+    LOG_DEBUG("Backlight %s", (uiconfig.screen_brightness > 0) ? "ON" : "OFF");
+    menuHandler::saveUIConfig();
+
+#if !defined(BOARD_BL_EN) && !defined(PIN_EINK_EN) && !defined(PCA_PIN_EINK_EN)
+    if (brightness > 0) {
+        brightness = 0;
+    } else {
+        brightness = 254;
+    }
+#if defined(ST7789_CS)
+    static_cast<TFTDisplay *>(dispdev)->setDisplayBrightness(brightness);
+#endif
+#endif
+}
+
 void Screen::handleOnPress()
 {
     // If screen was off, just wake it, otherwise advance to next frame
@@ -1997,6 +2066,8 @@ int Screen::handleInputEvent(const InputEvent *event)
                 } else if (this->ui->getUiState()->currentFrame == framesetInfo.positions.wifi) {
                     menuHandler::wifiBaseMenu();
                 }
+            } else if (event->inputEvent == INPUT_BROKER_BACKLIGHT_TOGGLE) {
+                toggleBacklight();
             } else if (event->inputEvent == INPUT_BROKER_BACK) {
                 showFrame(FrameDirection::PREVIOUS);
             } else if (event->inputEvent == INPUT_BROKER_CANCEL) {
