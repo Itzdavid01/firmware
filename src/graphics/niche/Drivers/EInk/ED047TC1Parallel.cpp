@@ -4,10 +4,19 @@
 
 #include "main.h"
 
+#include "variant.h"
+
 using namespace NicheGraphics::Drivers;
 
+#ifdef EPD_PADDING
+ED047TC1Parallel::ED047TC1Parallel() : EInk(960 - 2 * EPD_PADDING, 540 - 2 * EPD_PADDING, (UpdateTypes)(FULL | FAST))
+{
+    xOffset = EPD_PADDING;
+    yOffset = EPD_PADDING;
+#else
 ED047TC1Parallel::ED047TC1Parallel() : EInk(960, 540, (UpdateTypes)(FULL | FAST))
 {
+#endif
     epaper = new FASTEPD;
 }
 
@@ -41,18 +50,24 @@ void ED047TC1Parallel::update(uint8_t *imageData, UpdateTypes type)
     // Copy the InkHUD buffer to FastEPD's current buffer
     // FastEPD buffer size is (width * height / 8) for 1BPP
     uint8_t *cur = epaper->currentBuffer();
-    size_t bufSize = (width * height) / 8;
+    size_t physBufSize = (physicalWidth * physicalHeight) / 8;
+    const uint16_t physRowBytes = physicalWidth / 8;
+    const uint16_t logRowBytes = ((width - 1) / 8) + 1;
+
+    // Clear physical buffer (0 = white)
+    memset(cur, 0, physBufSize);
 
     // InkHUD buffer is also horizontal-byte 1BPP
     // But we need to ensure polarity is correct.
     // FastEPD: 1 = black, 0 = white.
-    // InkHUD: 1 = white, 0 = black? (Let's check bitWrite in Renderer.cpp)
-    // Actually bitWrite(buffer[byteNum], bitNum, c) where c is Color.
-    // In InkHUD.h: enum Color { Black = 0, White = 1 };
-    // So InkHUD: 1 = white, 0 = black.
+    // InkHUD: 1 = white, 0 = black.
     // We NEED to invert it for FastEPD to get a white background (0 -> 1).
-    for (size_t i = 0; i < bufSize; i++) {
-        cur[i] = ~imageData[i];
+    for (uint16_t y = 0; y < height; y++) {
+        uint8_t *srcRow = &imageData[y * logRowBytes];
+        uint8_t *dstRow = &cur[(y + yOffset) * physRowBytes + (xOffset / 8)];
+        for (uint16_t xb = 0; xb < logRowBytes; xb++) {
+            dstRow[xb] = ~srcRow[xb];
+        }
     }
 
     if (type == FAST) {

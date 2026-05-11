@@ -1094,7 +1094,9 @@ void menuHandler::systemBaseMenu()
 #endif
 #ifdef HAS_READER
         } else if (selected == EReader) {
-            reader::ReaderFSM::getInstance()->launch();
+            // E-Reader is now an InkHUD applet — navigation handled by WindowManager.
+            // The EReader menu item is kept so existing builds still show it,
+            // but it does nothing. Users access the reader via InkHUD tile cycling.
 #endif
         } else if (selected == Back && !test_enabled) {
             test_count++;

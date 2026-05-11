@@ -30,6 +30,7 @@ Different NicheGraphics UIs and different hardware variants will each have their
 #include "graphics/niche/InkHUD/Applets/User/Positions/PositionsApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/RecentsList/RecentsListApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/ThreadedMessage/ThreadedMessageApplet.h"
+#include "reader/ReaderApplet.h"
 
 // Shared NicheGraphics components
 // --------------------------------
@@ -61,12 +62,13 @@ void setupNicheGraphics()
     inkhud->setDisplayResilience(7, 1.5);
 
     // Prepare fonts
-    InkHUD::Applet::fontLarge = FREESANS_9PT_WIN1252;
+    InkHUD::Applet::fontLarge = FREESANS_12PT_WIN1252;
+    InkHUD::Applet::fontMedium = FREESANS_9PT_WIN1252;
     InkHUD::Applet::fontSmall = FREESANS_6PT_WIN1252;
 
     // Init settings, and customize defaults
     inkhud->persistence->settings.userTiles.maxCount = 4; // T5S3 Pro has a big screen!
-    inkhud->persistence->settings.rotation = 3;           // 270 degrees clockwise (fix upside down)
+    inkhud->persistence->settings.rotation = 3;           // 270 degrees clockwise (Portrait)
     inkhud->persistence->settings.userTiles.count = 2;    // Two tiles by default
     inkhud->persistence->settings.optionalMenuItems.nextTile = true;
     inkhud->persistence->settings.optionalFeatures.batteryIcon = true;
@@ -90,7 +92,8 @@ void setupNicheGraphics()
     inkhud->addApplet("Channel 1", new InkHUD::ThreadedMessageApplet(1));
     inkhud->addApplet("Positions", new InkHUD::PositionsApplet, true); // Activated
     inkhud->addApplet("Recents List", new InkHUD::RecentsListApplet);
-    inkhud->addApplet("Heard", new InkHUD::HeardApplet, true, false, 0); // Activated, not autoshown, default on tile 0
+    inkhud->addApplet("Heard", new InkHUD::HeardApplet, true, false, 0);   // Activated, not autoshown, default on tile 0
+    inkhud->addApplet("Reader", new reader::ReaderApplet, true, false, 1); // Activated, not autoshown, tile 1
     // inkhud->addApplet("Basic", new InkHUD::BasicExampleApplet);
     // inkhud->addApplet("NewMsg", new InkHUD::NewMsgExampleApplet);
 

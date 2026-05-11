@@ -25,6 +25,10 @@ class ED047TC1Parallel : public EInk
   private:
     FASTEPD *epaper = nullptr;
     uint32_t lastUpdateMs = 0;
+    uint16_t physicalWidth = 960;
+    uint16_t physicalHeight = 540;
+    uint16_t xOffset = 0;
+    uint16_t yOffset = 0;
 };
 
 } // namespace NicheGraphics::Drivers
