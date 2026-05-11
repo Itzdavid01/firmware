@@ -5,6 +5,8 @@
 #include "ReaderFSM.h"
 
 using namespace NicheGraphics;
+using namespace NicheGraphics::InkHUD;
+using namespace NicheGraphics::Drivers;
 
 namespace reader
 {
@@ -113,7 +115,7 @@ void ReaderApplet::onNavUp()
 
 void ReaderApplet::refreshBookList()
 {
-    fillRect(0, 0, width(), height(), WHITE);
+    fillRect(0, 0, width(), height(), Color::WHITE);
     drawHeader("E-Reader");
 
     auto &books = ReaderController::instance().getBookFiles();
@@ -130,23 +132,23 @@ void ReaderApplet::refreshBookList()
         bool sel = (i == selected);
         int16_t y = startY + i * (fontMedium.lineHeight() + 4);
         if (sel) {
-            fillRect(0, y, width(), fontMedium.lineHeight() + 4, BLACK);
-            setTextColor(WHITE);
+            fillRect(0, y, width(), fontMedium.lineHeight() + 4, Color::BLACK);
+            setTextColor(Color::WHITE);
         } else {
-            setTextColor(BLACK);
+            setTextColor(Color::BLACK);
         }
         std::string path = books[i];
         size_t slash = path.find_last_of('/');
         std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
         printAt(4, y, name);
     }
-    setTextColor(BLACK);
+    setTextColor(Color::BLACK);
 }
 
 void ReaderApplet::refreshReading()
 {
     auto &ctrl = ReaderController::instance();
-    fillRect(0, 0, width(), height(), WHITE);
+    fillRect(0, 0, width(), height(), Color::WHITE);
 
     std::string bookName = ctrl.getOpenBookPath();
     size_t slash = bookName.find_last_of('/');
