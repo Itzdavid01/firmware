@@ -47,9 +47,13 @@ void ED047TC1Parallel::begin(SPIClass *spi, uint8_t pin_dc, uint8_t pin_cs, uint
 
 void ED047TC1Parallel::update(uint8_t *imageData, UpdateTypes type)
 {
-    // Copy the InkHUD buffer to FastEPD's current buffer
-    // FastEPD buffer size is (width * height / 8) for 1BPP
     uint8_t *cur = epaper->currentBuffer();
+    if (!cur) {
+        LOG_ERROR("FastEPD currentBuffer is null - display may be out of memory");
+        failed = true;
+        return;
+    }
+
     size_t physBufSize = (physicalWidth * physicalHeight) / 8;
     const uint16_t physRowBytes = physicalWidth / 8;
     const uint16_t logRowBytes = ((width - 1) / 8) + 1;
