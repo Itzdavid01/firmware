@@ -1,8 +1,13 @@
-#pragma once
+#ifdef MESHTASTIC_INCLUDE_INKHUD
 
-#include <OLEDDisplay.h>
+#pragma once
+#include <cstdint>
 #include <string>
-#include <vector>
+
+namespace NicheGraphics::InkHUD
+{
+class Applet;
+}
 
 namespace reader
 {
@@ -11,11 +16,15 @@ class DocumentRenderer
 {
   public:
     DocumentRenderer() = default;
-    void renderPage(OLEDDisplay *display, const std::string &text, int pageOffset);
-    int calculatePages(OLEDDisplay *display, const std::string &text);
+
+    void renderPage(NicheGraphics::InkHUD::Applet *applet, const std::string &text, int pageOffset);
+
+    int calculatePages(NicheGraphics::InkHUD::Applet * /*display*/, const std::string & /*text*/) { return 1; }
 
   private:
-    int fontSize = 10;
+    int fontSize = 16;
 };
 
 } // namespace reader
+
+#endif
