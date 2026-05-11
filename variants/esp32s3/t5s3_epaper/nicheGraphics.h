@@ -30,7 +30,9 @@ Different NicheGraphics UIs and different hardware variants will each have their
 #include "graphics/niche/InkHUD/Applets/User/Positions/PositionsApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/RecentsList/RecentsListApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/ThreadedMessage/ThreadedMessageApplet.h"
+#ifdef HAS_READER
 #include "reader/ReaderApplet.h"
+#endif
 
 // Shared NicheGraphics components
 // --------------------------------
@@ -92,8 +94,10 @@ void setupNicheGraphics()
     inkhud->addApplet("Channel 1", new InkHUD::ThreadedMessageApplet(1));
     inkhud->addApplet("Positions", new InkHUD::PositionsApplet, true); // Activated
     inkhud->addApplet("Recents List", new InkHUD::RecentsListApplet);
-    inkhud->addApplet("Heard", new InkHUD::HeardApplet, true, false, 0);   // Activated, not autoshown, default on tile 0
+    inkhud->addApplet("Heard", new InkHUD::HeardApplet, true, false, 0); // Activated, not autoshown, default on tile 0
+#ifdef HAS_READER
     inkhud->addApplet("Reader", new reader::ReaderApplet, true, false, 1); // Activated, not autoshown, tile 1
+#endif
     // inkhud->addApplet("Basic", new InkHUD::BasicExampleApplet);
     // inkhud->addApplet("NewMsg", new InkHUD::NewMsgExampleApplet);
 
