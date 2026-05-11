@@ -1,6 +1,8 @@
 #include "EpubParser.h"
+#include "ChapterCache.h"
 #include "main.h"
 #include "miniz_zip.h"
+#include <SD.h>
 
 namespace reader
 {
@@ -18,7 +20,6 @@ bool EpubParser::open(const std::string &path)
         return false;
     }
 
-    // EPUBs have a META-INF/container.xml that points to the .opf file
     size_t file_size;
     void *p = mz_zip_reader_extract_file_to_heap(&zip_archive, "META-INF/container.xml", &file_size, 0);
     if (!p) {
@@ -30,7 +31,6 @@ bool EpubParser::open(const std::string &path)
     std::string container_xml((char *)p, file_size);
     free(p);
 
-    // Simple search for full-path (proper XML parsing is heavy)
     size_t pos = container_xml.find("full-path=\"");
     if (pos == std::string::npos) {
         LOG_ERROR("Malformed container.xml");
@@ -43,7 +43,6 @@ bool EpubParser::open(const std::string &path)
 
     LOG_INFO("Found OPF: %s", opf_path.c_str());
 
-    // Store folder for resolving relative paths
     size_t last_slash = opf_path.find_last_of("/");
     opfFolder = (last_slash == std::string::npos) ? "" : opf_path.substr(0, last_slash + 1);
 
@@ -57,7 +56,6 @@ bool EpubParser::open(const std::string &path)
     std::string opf_content((char *)p, file_size);
     free(p);
 
-    // 1. Build an ID-to-Path map from the manifest
     std::vector<std::pair<std::string, std::string>> manifest;
     size_t item_pos = 0;
     while ((item_pos = opf_content.find("<item ", item_pos)) != std::string::npos) {
@@ -76,7 +74,6 @@ bool EpubParser::open(const std::string &path)
         item_pos += 1;
     }
 
-    // 2. Parse the spine to get the correct reading order
     chapterPaths.clear();
     size_t spine_pos = opf_content.find("<spine");
     if (spine_pos != std::string::npos) {
@@ -88,7 +85,6 @@ bool EpubParser::open(const std::string &path)
                 size_t end_idref = opf_content.find("\"", idref_pos);
                 std::string idref = opf_content.substr(idref_pos, end_idref - idref_pos);
 
-                // Find this ID in our manifest
                 for (const auto &item : manifest) {
                     if (item.first == idref) {
                         chapterPaths.push_back(opfFolder + item.second);
@@ -97,13 +93,11 @@ bool EpubParser::open(const std::string &path)
                 }
             }
             itemref_pos += 1;
-            // Stop if we hit the end of the spine
             if (itemref_pos > opf_content.find("</spine>", spine_pos))
                 break;
         }
     }
 
-    // Fallback to manifest order if spine parsing failed
     if (chapterPaths.empty()) {
         for (const auto &item : manifest) {
             chapterPaths.push_back(opfFolder + item.second);
@@ -121,6 +115,41 @@ std::string EpubParser::getChapter(int index)
     if (index < 0 || index >= (int)chapterPaths.size())
         return "";
 
+    std::string cached = getChapterFromCache(index);
+    if (!cached.empty()) {
+        LOG_INFO("EpubParser: cache hit chapter %d", index);
+        return cached;
+    }
+
+    LOG_INFO("EpubParser: cache miss chapter %d, extracting from zip", index);
+    std::string content = getChapterFromZip(index);
+    if (!content.empty()) {
+        writeChapterToCache(index, content);
+    }
+    return content;
+}
+
+std::string EpubParser::getChapterFromCache(int index)
+{
+    std::string path = CacheKey::sectionPath(bookPath, index);
+    File f = SD.open(path.c_str(), FILE_READ);
+    if (!f) {
+        return "";
+    }
+    std::string content;
+    while (f.available()) {
+        char buf[256];
+        int rb = f.read((uint8_t *)buf, sizeof(buf));
+        if (rb <= 0)
+            break;
+        content.append(buf, rb);
+    }
+    f.close();
+    return content;
+}
+
+std::string EpubParser::getChapterFromZip(int index)
+{
     mz_zip_archive zip_archive;
     memset(&zip_archive, 0, sizeof(zip_archive));
     if (!mz_zip_reader_init_file(&zip_archive, bookPath.c_str(), 0))
@@ -135,6 +164,55 @@ std::string EpubParser::getChapter(int index)
     std::string content((char *)p, file_size);
     free(p);
     return content;
+}
+
+void EpubParser::writeChapterToCache(int index, const std::string &content)
+{
+    std::string cacheRoot = CacheKey::ensureCacheRootForEpub(bookPath);
+    if (cacheRoot.empty()) {
+        LOG_WARN("EpubParser: could not create cache root, skipping cache write");
+        return;
+    }
+    std::string path = CacheKey::sectionPath(bookPath, index);
+    File f = SD.open(path.c_str(), FILE_WRITE);
+    if (!f) {
+        LOG_WARN("EpubParser: could not open %s for write", path.c_str());
+        return;
+    }
+    size_t wb = f.write((const uint8_t *)content.c_str(), content.length());
+    f.close();
+    if (wb != content.length()) {
+        LOG_WARN("EpubParser: incomplete write to %s", path.c_str());
+    }
+}
+
+void EpubParser::invalidateChapterCache()
+{
+    std::string root = CacheKey::ensureCacheRootForEpub(bookPath);
+    if (root.empty())
+        return;
+    std::string sectionsDir = root + "/sections";
+    File rootDir = SD.open(sectionsDir.c_str());
+    if (!rootDir || !rootDir.isDirectory())
+        return;
+
+    File f;
+    while ((f = rootDir.openNextFile())) {
+        std::string fname = f.name();
+        f.close();
+        SD.remove(fname.c_str());
+    }
+    rootDir.close();
+}
+
+bool EpubParser::isSdCardPresent() const
+{
+    File f = SD.open("/sd/", FILE_READ);
+    if (!f)
+        return false;
+    bool isDir = f.isDirectory();
+    f.close();
+    return isDir;
 }
 
 int EpubParser::getChapterCount() const

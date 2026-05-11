@@ -6,6 +6,7 @@
 
 #include "DocumentRenderer.h"
 #include "EpubParser.h"
+#include "ProgressStore.h"
 
 namespace reader
 {
@@ -26,7 +27,9 @@ class ReaderFSM
 
   private:
     ReaderFSM() = default;
-    ReaderState currentState = ReaderState::BOOK_LIST;
+    ReaderFSM(const ReaderFSM &) = delete;
+    ReaderFSM &operator=(const ReaderFSM &) = delete;
+    ReaderState currentState = ReaderState::SUSPENDED;
 
     EpubParser parser;
     DocumentRenderer renderer;
@@ -41,9 +44,14 @@ class ReaderFSM
     void scanForBooks();
     int handleInputEvent(const InputEvent *event);
     void refreshDisplay();
+    void saveProgress();
+    void loadProgress();
 
     std::vector<std::string> bookFiles;
     int selectedBookIndex = 0;
+    std::string openBookPath;
+    uint32_t lastProgressSaveMs = 0;
+    static constexpr uint32_t PROGRESS_SAVE_DEBOUNCE_MS = 2000;
 };
 
 } // namespace reader

@@ -1,4 +1,4 @@
-# T5S3 E-Paper Pro Development Log - May 6, 2026
+# T5S3 E-Paper Pro Development Log
 
 ## Overview
 
@@ -42,3 +42,41 @@ Efforts today focused on stabilizing the LilyGo T5S3 E-Paper Pro (H752-01) varia
 - Completely refactor the `PowerFSM` interaction with `BOARD_BL_EN` for E-Ink variants.
 - Investigate if `FastEPD` is internally resetting the I2C expander pins during its own initialization.
 - Move the `backlightOnPreference` into persistent NVS storage so it survives reboots.
+
+---
+
+## Phase 2: Chapter Cache & Progress Persistence (May 9–11, 2026)
+
+**Branch:** `t5s3-epaper-ereader-poc`
+
+### What was done
+
+Study of CrossPoint Reader (MIT, https://github.com/song9466/CrossPoint-Reader) revealed two discrete systems to replicate:
+
+1. **Chapter cache** — decompress sections on-demand, store raw text in `/sd/.crosspoint/epub_<8-hex>/sections/<idx>.txt`. Avoids re-parsing the ZIP and re-decompressing HTML on every open.
+2. **Progress persistence** — save `chapterIndex`, `pageOffset`, `timestamp` as a 12-byte binary to `progress.bin` alongside the cache.
+
+### Implementation
+
+- `src/reader/ChapterCache.h/cpp` — FNV-1a 32-bit hash for deterministic cache keys (no `std::hash` variance), `ensureCacheRootForEpub()`, `sectionPath()`, `progressPath()`, `bookCachePath()`
+- `src/reader/ProgressStore.h/cpp` — `ReadingProgress` struct (12 bytes), `loadReadingProgress()`, `saveReadingProgress()`
+- `src/reader/EpubParser.h/cpp` — cache-aware `getChapter()` (cache-first, ZIP fallback, write-through on miss), `isSdCardPresent()`, `getBookPath()`, `invalidateChapterCache()`
+- `src/reader/ReaderFSM.h/cpp` — `openBookPath`, `loadProgress()`, `saveProgress()` with 2 s debounce; progress auto-saved on book close and every 2 s during reading; restored on book open
+
+### Preserved (another agent's pre-existing changes)
+
+- VFS `opendir`/`readdir` book scan in `ReaderFSM.cpp`
+- SD retry-at-4MHz on failure in `FSCommon.cpp`
+
+### Tests
+
+- `test/test_reader/test_fnv_hash.cpp` — FNV-1a known-vector verification (4 cases)
+- `test/test_reader/test_progress_store.cpp` — 12-byte struct serialization round-trip (4 cases)
+
+### Build
+
+- `pio run -e t5s3-epaper-v2-reader` — ✅ exit 0
+
+### Blockers
+
+- Native unit tests (`pio test -e native`) blocked by missing `libyaml-cpp-dev` on host (no sudo available)

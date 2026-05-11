@@ -1,7 +1,12 @@
 #include "ReaderFSM.h"
+#include "gps/RTC.h"
 #include "graphics/Screen.h"
 #include "main.h"
 #include <SD.h>
+#include <algorithm>
+
+#include <dirent.h>
+#include <sys/stat.h>
 
 namespace reader
 {
@@ -15,6 +20,12 @@ ReaderFSM *ReaderFSM::getInstance()
 void ReaderFSM::init()
 {
     LOG_INFO("ReaderFSM init");
+#ifdef HAS_SDCARD
+    LOG_INFO("ReaderFSM: HAS_SDCARD is defined");
+    scanForBooks();
+#else
+    LOG_INFO("ReaderFSM: HAS_SDCARD is NOT defined");
+#endif
     currentState = ReaderState::SUSPENDED;
     inputObserver.observe(inputBroker);
 }
@@ -24,27 +35,32 @@ void ReaderFSM::scanForBooks()
     bookFiles.clear();
     selectedBookIndex = 0;
 #ifdef HAS_SDCARD
-    File root = SD.open("/");
-    if (!root) {
-        LOG_ERROR("Reader: Failed to open /sd root");
-        return;
-    }
-    if (!root.isDirectory()) {
-        LOG_ERROR("Reader: /sd root is not a directory");
-        return;
-    }
+    LOG_INFO("Reader: Scanning /sd for books...");
 
-    File file = root.openNextFile();
-    while (file) {
-        if (!file.isDirectory()) {
-            std::string filename = file.name();
-            if (filename.length() > 5 && filename.substr(filename.length() - 5) == ".epub") {
-                bookFiles.push_back(filename);
-                LOG_INFO("Reader: Found book %s", filename.c_str());
+    DIR *dir = opendir("/sd");
+    if (!dir) {
+        LOG_ERROR("Reader: Failed to opendir /sd - error: %s", strerror(errno));
+    } else {
+        struct dirent *ent;
+        while ((ent = readdir(dir)) != NULL) {
+            std::string filename = ent->d_name;
+            LOG_INFO("Reader: VFS found entry [%s], type %d", filename.c_str(), ent->d_type);
+
+            if (ent->d_type == DT_REG || ent->d_type == DT_UNKNOWN) {
+                if (filename.length() > 5) {
+                    std::string ext = filename.substr(filename.length() - 5);
+                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                    if (ext == ".epub") {
+                        bookFiles.push_back(filename);
+                        LOG_INFO("Reader: Added book %s", filename.c_str());
+                    }
+                }
             }
         }
-        file = root.openNextFile();
+        closedir(dir);
     }
+
+    LOG_INFO("Reader: Finished scan. Found %u epubs", bookFiles.size());
 #endif
     if (bookFiles.empty()) {
         LOG_WARN("Reader: No EPUB files found on SD card");
@@ -60,10 +76,7 @@ void ReaderFSM::launch()
     refreshDisplay();
 }
 
-void ReaderFSM::update()
-{
-    // State machine logic
-}
+void ReaderFSM::update() {}
 
 void ReaderFSM::refreshDisplay()
 {
@@ -83,7 +96,7 @@ void ReaderFSM::refreshDisplay()
         } else {
             for (size_t i = 0; i < bookFiles.size() && i < 10; i++) {
                 std::string entry = ((int)i == selectedBookIndex ? "> " : "  ") + bookFiles[i];
-                display->drawString(0, 30 + (i * 15), entry.c_str());
+                display->drawString(0, 30 + (int)(i * 15), entry.c_str());
             }
         }
         display->display();
@@ -112,11 +125,13 @@ int ReaderFSM::handleInputEvent(const InputEvent *event)
             if (!bookFiles.empty() && selectedBookIndex < (int)bookFiles.size()) {
                 std::string path = "/sd/" + bookFiles[selectedBookIndex];
                 if (parser.open(path)) {
+                    openBookPath = path;
                     currentState = ReaderState::READING;
                     currentChapter = 0;
                     currentPageOffset = 0;
                     currentChapterText = "";
                     LOG_INFO("Reader: Opening %s", path.c_str());
+                    loadProgress();
                     refreshDisplay();
                 } else {
                     LOG_ERROR("Reader: Failed to open %s", path.c_str());
@@ -124,12 +139,12 @@ int ReaderFSM::handleInputEvent(const InputEvent *event)
             }
         } else if (event->inputEvent == INPUT_BROKER_DOWN) {
             if (!bookFiles.empty()) {
-                selectedBookIndex = (selectedBookIndex + 1) % bookFiles.size();
+                selectedBookIndex = (selectedBookIndex + 1) % (int)bookFiles.size();
                 refreshDisplay();
             }
         } else if (event->inputEvent == INPUT_BROKER_UP) {
             if (!bookFiles.empty()) {
-                selectedBookIndex = (selectedBookIndex + bookFiles.size() - 1) % bookFiles.size();
+                selectedBookIndex = (selectedBookIndex + (int)bookFiles.size() - 1) % (int)bookFiles.size();
                 refreshDisplay();
             }
         } else if (event->inputEvent == INPUT_BROKER_BACK || event->inputEvent == INPUT_BROKER_ALT_PRESS) {
@@ -141,12 +156,12 @@ int ReaderFSM::handleInputEvent(const InputEvent *event)
         break;
     case ReaderState::READING:
         if (event->inputEvent == INPUT_BROKER_BACK) {
+            saveProgress();
             currentState = ReaderState::BOOK_LIST;
             LOG_INFO("Reader: Returning to BOOK_LIST");
             refreshDisplay();
         } else if (event->inputEvent == INPUT_BROKER_DOWN || event->inputEvent == INPUT_BROKER_USER_PRESS) {
-            // Next page
-            currentPageOffset += 500; // Naive char offset
+            currentPageOffset += 500;
             if (currentPageOffset >= (int)currentChapterText.length()) {
                 if (currentChapter < parser.getChapterCount() - 1) {
                     currentChapter++;
@@ -154,13 +169,15 @@ int ReaderFSM::handleInputEvent(const InputEvent *event)
                     currentChapterText = "";
                     LOG_INFO("Reader: Moving to next chapter %d", currentChapter);
                 } else {
-                    currentPageOffset = currentChapterText.length() - 100; // Cap at end
+                    currentPageOffset = (int)currentChapterText.length() - 100;
                 }
             }
             LOG_INFO("Reader: Next page, offset %d", currentPageOffset);
+            if (millis() - lastProgressSaveMs >= PROGRESS_SAVE_DEBOUNCE_MS) {
+                saveProgress();
+            }
             refreshDisplay();
         } else if (event->inputEvent == INPUT_BROKER_UP) {
-            // Previous page
             currentPageOffset -= 500;
             if (currentPageOffset < 0) {
                 if (currentChapter > 0) {
@@ -173,6 +190,9 @@ int ReaderFSM::handleInputEvent(const InputEvent *event)
                 }
             }
             LOG_INFO("Reader: Previous page, offset %d", currentPageOffset);
+            if (millis() - lastProgressSaveMs >= PROGRESS_SAVE_DEBOUNCE_MS) {
+                saveProgress();
+            }
             refreshDisplay();
         }
         break;
@@ -180,6 +200,41 @@ int ReaderFSM::handleInputEvent(const InputEvent *event)
         break;
     }
     return 0;
+}
+
+void ReaderFSM::saveProgress()
+{
+    if (openBookPath.empty())
+        return;
+    ReadingProgress progress;
+    progress.chapterIndex = currentChapter;
+    progress.pageOffset = currentPageOffset;
+    progress.timestamp = getTime();
+    if (saveReadingProgress(openBookPath, progress)) {
+        lastProgressSaveMs = millis();
+        LOG_INFO("Reader: Saved progress ch=%d off=%d", currentChapter, currentPageOffset);
+    } else {
+        LOG_WARN("Reader: Failed to save progress");
+    }
+}
+
+void ReaderFSM::loadProgress()
+{
+    if (openBookPath.empty())
+        return;
+    ReadingProgress progress;
+    if (loadReadingProgress(openBookPath, progress)) {
+        if (progress.chapterIndex >= 0 && progress.chapterIndex < parser.getChapterCount()) {
+            currentChapter = progress.chapterIndex;
+            currentPageOffset = std::max(0, progress.pageOffset);
+            currentChapterText = "";
+            LOG_INFO("Reader: Loaded progress ch=%d off=%d", currentChapter, currentPageOffset);
+        } else {
+            LOG_INFO("Reader: Saved progress out of range, starting from beginning");
+        }
+    } else {
+        LOG_INFO("Reader: No saved progress found, starting from beginning");
+    }
 }
 
 void ReaderFSM::nextTile()

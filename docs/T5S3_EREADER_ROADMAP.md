@@ -19,10 +19,10 @@ This document tracks the implementation of major performance and usability impro
 - **Problem:** "Next Page" blindly jumps exactly 500 characters, leading to overlapping text or skipped paragraphs due to dynamic word wrapping.
 - **Implementation:** Calculate the exact number of characters that fit on the screen in `DocumentRenderer`. Iterate through words, measuring width with `display->getStringWidth()` and tracking line counts up to `EPD_HEIGHT`.
 
-## 4. Progress Saving
+## 4. Progress Saving (COMPLETED)
 
 - **Problem:** Exiting the app or rebooting loses the current book, chapter, and page offset.
-- **Implementation:** Save `currentChapter`, `currentPageOffset`, and `bookPath` to `userPrefs` or a dedicated `.json` file on the SD card to resume reading automatically when the app is launched.
+- **Implementation:** `ReadingProgress` struct (chapterIndex, pageOffset, timestamp) persisted to SD card via `ProgressStore`. Cache root: `/sd/.crosspoint/epub_<FNV-1a-hash>/progress.bin`. Progress auto-saved on book close and debounced (2 s) during reading; restored on book open. Cache-first chapter loading via `ChapterCache`. See `docs/T5S3_CROSSPOINT_INSPIRED_PLAN.md` for design details.
 
 ## 5. Memory-Safe Chunking
 
