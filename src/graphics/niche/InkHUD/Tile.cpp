@@ -58,6 +58,20 @@ void InkHUD::Tile::setRegion(uint8_t userTileCount, uint8_t tileIndex)
     uint16_t displayWidth = inkhud->width();
     uint16_t displayHeight = inkhud->height();
 
+    // Optional uniform border inset for this variant, so applet content does not run to the
+    // very panel edge. originX/Y shift the tile area inward; displayWidth/Height shrink to match.
+    int16_t originX = 0;
+    int16_t originY = 0;
+#ifdef INKHUD_USER_TILE_MARGIN
+    const uint16_t tileMargin = INKHUD_USER_TILE_MARGIN;
+    if (displayWidth > 2 * tileMargin && displayHeight > 2 * tileMargin) {
+        originX = tileMargin;
+        originY = tileMargin;
+        displayWidth -= 2 * tileMargin;
+        displayHeight -= 2 * tileMargin;
+    }
+#endif
+
     bool landscape = displayWidth > displayHeight;
 
     // Check for any stray tiles
@@ -79,8 +93,8 @@ void InkHUD::Tile::setRegion(uint8_t userTileCount, uint8_t tileIndex)
     switch (userTileCount) {
     // One tile only
     case 1:
-        left = 0;
-        top = 0;
+        left = originX;
+        top = originY;
         width = displayWidth;
         height = displayHeight;
         break;
@@ -89,14 +103,14 @@ void InkHUD::Tile::setRegion(uint8_t userTileCount, uint8_t tileIndex)
     case 2:
         if (landscape) {
             // Side by side
-            left = ((displayWidth / 2) + (spacing / 2)) * tileIndex;
-            top = 0;
+            left = originX + ((displayWidth / 2) + (spacing / 2)) * tileIndex;
+            top = originY;
             width = (displayWidth / 2) - (spacing / 2);
             height = displayHeight;
         } else {
             // Above and below
-            left = 0;
-            top = 0 + (((displayHeight / 2) + (spacing / 2)) * tileIndex);
+            left = originX;
+            top = originY + (((displayHeight / 2) + (spacing / 2)) * tileIndex);
             width = displayWidth;
             height = (displayHeight / 2) - (spacing / 2);
         }
@@ -108,20 +122,20 @@ void InkHUD::Tile::setRegion(uint8_t userTileCount, uint8_t tileIndex)
         height = (displayHeight / 2) - (spacing / 2);
         switch (tileIndex) {
         case 0:
-            left = 0;
-            top = 0;
+            left = originX;
+            top = originY;
             break;
         case 1:
-            left = 0 + (width - 1) + spacing;
-            top = 0;
+            left = originX + (width - 1) + spacing;
+            top = originY;
             break;
         case 2:
-            left = 0;
-            top = 0 + (height - 1) + spacing;
+            left = originX;
+            top = originY + (height - 1) + spacing;
             break;
         case 3:
-            left = 0 + (width - 1) + spacing;
-            top = 0 + (height - 1) + spacing;
+            left = originX + (width - 1) + spacing;
+            top = originY + (height - 1) + spacing;
             break;
         }
         break;

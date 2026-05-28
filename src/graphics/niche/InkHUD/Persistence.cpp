@@ -15,6 +15,14 @@ void InkHUD::Persistence::loadSettings()
         settings = loadedSettings; // Version matched, replace the defaults with the loaded values
     else
         LOG_WARN("Settings version changed. Using defaults");
+
+#ifdef INKHUD_FORCE_SINGLE_TILE
+    // This variant always shows exactly one applet at a time, regardless of any persisted layout.
+    // Override the loaded count/maxCount so a previously-saved multi-tile layout can't return,
+    // and so the "layout" menu item (gated on maxCount > 1) is hidden.
+    settings.userTiles.count = 1;
+    settings.userTiles.maxCount = 1;
+#endif
 }
 
 // Load settings and latestMessage data

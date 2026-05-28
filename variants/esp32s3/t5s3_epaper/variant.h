@@ -4,6 +4,15 @@
 #define EPD_WIDTH 960
 #define EPD_HEIGHT 540
 
+// Blank border (px) inset around the InkHUD user-tile area on this large 4.7" panel,
+// so applet content does not run to the very edge. Consumed in InkHUD Tile::setRegion. Tunable.
+#define INKHUD_USER_TILE_MARGIN 20
+
+// This variant shows exactly one applet at a time. Force userTiles.count=maxCount=1 after the
+// persisted InkHUD settings load, so an earlier multi-tile layout can't survive a reflash.
+// Consumed in InkHUD Persistence::loadSettings.
+#define INKHUD_FORCE_SINGLE_TILE 1
+
 #define CANNED_MESSAGE_MODULE_ENABLE 1
 #define USE_VIRTUAL_KEYBOARD 1
 
