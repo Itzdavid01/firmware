@@ -6,26 +6,27 @@ NicheGraphics attempts a different approach:
 Per-device config takes place in this setupNicheGraphics() method
 (And a small amount in platformio.ini)
 
-This file sets up InkHUD for Heltec VM-E290.
-Different NicheGraphics UIs and different hardware variants will each have their own setup procedure.
+This file sets up InkHUD for the LilyGo T5-E-Paper-S3-Pro.
+
+The board uses a 4.7" ED047TC1 parallel e-paper display (960×540, 8-bit parallel interface).
+This is driven via the FastEPD library through the NicheGraphics ED047TC1 driver adapter.
 
 */
 
 #pragma once
 
 #include "configuration.h"
-#include "mesh/MeshModule.h"
 
 #ifdef MESHTASTIC_INCLUDE_NICHE_GRAPHICS
 
 // InkHUD-specific components
 // ---------------------------
-// #include "graphics/niche/InkHUD/InkHUD.h"
-#include "graphics/niche/InkHUD/WindowManager.h"
+#include "graphics/niche/InkHUD/InkHUD.h"
 
 // Applets
 #include "graphics/niche/InkHUD/Applets/User/AllMessage/AllMessageApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/DM/DMApplet.h"
+#include "graphics/niche/InkHUD/Applets/User/FavoritesMap/FavoritesMapApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/Heard/HeardApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/Positions/PositionsApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/RecentsList/RecentsListApplet.h"
@@ -48,8 +49,10 @@ void setupNicheGraphics()
 
     // E-Ink Driver
     // -----------------------------
+    // The ED047TC1 is a parallel display — no SPI bus setup needed.
+    // begin() args are part of the EInk interface but are ignored for parallel displays.
 
-    // Use E-Ink driver
+    // Use E-Ink driver (parallel ED047TC1 via FastEPD)
     Drivers::EInk *driver = new Drivers::ED047TC1Parallel;
     driver->begin(nullptr, -1, -1, -1); // Parallel driver doesn't need SPI/DC/CS/BUSY here
 
@@ -67,10 +70,10 @@ void setupNicheGraphics()
     // Set how unhealthy additional FAST updates beyond this number are
     inkhud->setDisplayResilience(7, 1.5);
 
-    // Prepare fonts
-    InkHUD::Applet::fontLarge = FREESANS_24PT_WIN1252;
-    InkHUD::Applet::fontMedium = FREESANS_18PT_WIN1252;
-    InkHUD::Applet::fontSmall = FREESANS_12PT_WIN1252;
+    // Prepare fonts — larger sizes to suit the 4.7" screen at ~234 DPI
+    InkHUD::Applet::fontLarge = FREESANS_24PT_WIN1253;
+    InkHUD::Applet::fontMedium = FREESANS_18PT_WIN1253;
+    InkHUD::Applet::fontSmall = FREESANS_12PT_WIN1253;
 
     // Init settings, and customize defaults
     inkhud->persistence->settings.userTiles.maxCount = 4; // T5S3 Pro has a big screen!
@@ -109,13 +112,24 @@ void setupNicheGraphics()
     inkhud->addApplet("Reader", new reader::ReaderApplet, true, false, 0); // Activated, not autoshown, tile 0
     LOG_INFO("setupNicheGraphics: after Reader, free heap: %d", ESP.getFreeHeap());
 #endif
+    inkhud->addApplet("Favorites Map", new InkHUD::FavoritesMapApplet, false, false); // Not Active, not autoshown
     // inkhud->addApplet("Basic", new InkHUD::BasicExampleApplet);
     // inkhud->addApplet("NewMsg", new InkHUD::NewMsgExampleApplet);
+
+    // Enable reusable InkHUD touch status indicator for this touch-capable board.
+    inkhud->setTouchEnabledProvider(isTouchInputEnabled);
 
     // Start running InkHUD
     LOG_INFO("setupNicheGraphics: calling inkhud->begin()");
     inkhud->begin();
     LOG_INFO("setupNicheGraphics: inkhud->begin() complete");
+
+    // Arm GT911 capacitive-home callback only after InkHUD startup is complete.
+    t5SetHomeCapButtonEventsEnabled(true);
+
+    // Keep single-button semantics regardless of persisted settings:
+    // short press advances, long press opens menu/selects.
+    inkhud->persistence->settings.joystick.enabled = false;
 
     // Buttons
     // --------------------------
@@ -125,16 +139,18 @@ void setupNicheGraphics()
     buttons->initObservers();
     LOG_INFO("setupNicheGraphics: observers initialized");
 
-    // Setup the main user button (0)
-    buttons->setWiring(0, BUTTON_PIN);
-    buttons->setHandlerShortPress(0, []() { InkHUD::InkHUD::getInstance()->shortpress(); });
-    buttons->setHandlerLongPress(0, []() { InkHUD::InkHUD::getInstance()->longpress(); });
+    // #0: BOOT button (primary user input for InkHUD navigation on T5-S3)
+#if defined(T5_S3_EPAPER_PRO_V1)
+    buttons->setWiring(0, PIN_BUTTON2);
+#else
+#endif
+    buttons->setHandlerShortPress(0, [inkhud]() { inkhud->shortpress(); });
+    buttons->setHandlerLongPress(0, [inkhud]() { inkhud->longpress(); });
 
 #if defined(T5_S3_EPAPER_PRO_V1)
-    // Setup the aux button (1)
-    // V1 has two buttons
+    // Aux button (1) — V1 has two buttons
     buttons->setWiring(1, PIN_BUTTON2);
-    buttons->setHandlerShortPress(1, []() { InkHUD::InkHUD::getInstance()->nextTile(); });
+    buttons->setHandlerShortPress(1, [inkhud]() { inkhud->nextTile(); });
 #endif
 
     buttons->start();
