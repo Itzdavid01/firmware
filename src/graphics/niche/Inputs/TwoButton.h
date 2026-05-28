@@ -34,6 +34,7 @@ class TwoButton : protected concurrency::OSThread
 
     static TwoButton *getInstance(); // Create or get the singleton instance
     void start();                    // Start handling button input
+    void initObservers();            // Deferred observer registration (call after construction)
     void stop();                     // Stop handling button input (disconnect ISRs for sleep)
     void setWiring(uint8_t whichButton, uint8_t pin, bool internalPullup = false);
     void setTiming(uint8_t whichButton, uint32_t debounceMs, uint32_t longpressMs);

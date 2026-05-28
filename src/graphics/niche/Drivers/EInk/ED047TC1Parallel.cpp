@@ -31,9 +31,7 @@ void ED047TC1Parallel::begin(SPIClass *spi, uint8_t pin_dc, uint8_t pin_cs, uint
 #if defined(T5_S3_EPAPER_PRO_V1)
     epaper->initPanel(BB_PANEL_LILYGO_T5PRO, 28000000);
 #else
-    // Default to V2 if not specified, or if T5_S3_EPAPER_PRO_V2 is defined
     epaper->initPanel(BB_PANEL_LILYGO_T5PRO_V2, 28000000);
-    // Initialize all port 0 pins as outputs / HIGH (some are used for power control on V2)
     for (int i = 0; i < 8; i++) {
         epaper->ioPinMode(i, OUTPUT);
         epaper->ioWrite(i, HIGH);
@@ -70,16 +68,14 @@ void ED047TC1Parallel::update(uint8_t *imageData, UpdateTypes type)
         uint8_t *srcRow = &imageData[y * logRowBytes];
         uint8_t *dstRow = &cur[(y + yOffset) * physRowBytes + (xOffset / 8)];
         for (uint16_t xb = 0; xb < logRowBytes; xb++) {
-            dstRow[xb] = ~srcRow[xb];
+            dstRow[xb] = srcRow[xb];
         }
     }
 
     if (type == FAST) {
-        // Fast refresh
         epaper->fullUpdate(CLEAR_FAST, false);
         beginPolling(50, 500);
     } else {
-        // Full refresh
         epaper->fullUpdate(CLEAR_SLOW, false);
         beginPolling(100, 2000);
     }
@@ -87,10 +83,6 @@ void ED047TC1Parallel::update(uint8_t *imageData, UpdateTypes type)
 
 bool ED047TC1Parallel::isUpdateDone()
 {
-    // FastEPD doesn't expose a simple 'busy' check for the parallel bus
-    // because it's usually blocking unless using async extensions.
-    // But since we called fullUpdate(..., false), it's supposedly non-blocking?
-    // Actually, FastEPD fullUpdate is usually blocking.
     return true;
 }
 

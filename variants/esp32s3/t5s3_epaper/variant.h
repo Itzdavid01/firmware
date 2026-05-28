@@ -2,7 +2,6 @@
 // Display (E-Ink) ED047TC1 - 8bit parallel
 #define EPD_WIDTH 960
 #define EPD_HEIGHT 540
-#define EPD_PADDING 24
 
 #define CANNED_MESSAGE_MODULE_ENABLE 1
 #define USE_VIRTUAL_KEYBOARD 1

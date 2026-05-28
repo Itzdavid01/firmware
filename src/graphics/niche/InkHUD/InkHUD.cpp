@@ -64,13 +64,18 @@ void InkHUD::InkHUD::notifyApplyingChanges()
 // Call this only after you have configured InkHUD
 void InkHUD::InkHUD::begin()
 {
+    LOG_INFO("InkHUD::begin: loading settings");
     persistence->loadSettings();
     persistence->loadLatestMessage();
 
+    LOG_INFO("InkHUD::begin: windowManager->begin()");
     windowManager->begin();
+    LOG_INFO("InkHUD::begin: events->begin()");
     events->begin();
+    LOG_INFO("InkHUD::begin: renderer->begin()");
     renderer->begin();
     // LogoApplet shows boot screen here
+    LOG_INFO("InkHUD::begin: complete");
 }
 
 // Call this when your user button gets a short press

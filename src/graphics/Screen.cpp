@@ -131,10 +131,6 @@ static bool heartbeat = false;
 #endif
 
 #include "graphics/ScreenFonts.h"
-#include <Throttle.h>
-
-// Usage: int stringWidth = formatDateTime(datetimeStr, sizeof(datetimeStr), rtc_sec, display);
-// End Functions to write date/time to the screen
 
 extern bool hasUnreadMessage;
 
@@ -192,12 +188,6 @@ void Screen::setHeading(float heading)
     compassHeading = wrapHeading360(compassHeading + step);
 }
 
-// ==============================
-// Overlay Alert Banner Renderer
-// ==============================
-// Displays a temporary centered banner message (e.g., warning, status, etc.)
-// The banner appears in the center of the screen and disappears after the specified duration
-
 void Screen::showSimpleBanner(const char *message, uint32_t durationMs)
 {
     BannerOverlayOptions options;
@@ -207,7 +197,6 @@ void Screen::showSimpleBanner(const char *message, uint32_t durationMs)
     showOverlayBanner(options);
 }
 
-// Called to trigger a banner with custom message and duration
 void Screen::showOverlayBanner(BannerOverlayOptions banner_overlay_options)
 {
 #ifdef USE_EINK
@@ -231,7 +220,6 @@ void Screen::showOverlayBanner(BannerOverlayOptions banner_overlay_options)
     ui->update();
 }
 
-// Called to trigger a banner with custom message and duration
 void Screen::showNodePicker(const char *message, uint32_t durationMs, std::function<void(uint32_t)> bannerCallback)
 {
 #ifdef USE_EINK
@@ -253,7 +241,6 @@ void Screen::showNodePicker(const char *message, uint32_t durationMs, std::funct
     ui->update();
 }
 
-// Called to trigger a banner with custom message and duration
 void Screen::showNumberPicker(const char *message, uint32_t durationMs, uint8_t digits,
                               std::function<void(uint32_t)> bannerCallback)
 {
@@ -1513,10 +1500,8 @@ void Screen::blink()
         dispdev->clear();
         dispdev->display();
         delay(50);
-        count = count - 1;
+        count--;
     }
-    // The dispdev->setBrightness does not work for t-deck display, it seems to run the setBrightness function in
-    // OLEDDisplay.
     dispdev->setBrightness(brightness);
 }
 

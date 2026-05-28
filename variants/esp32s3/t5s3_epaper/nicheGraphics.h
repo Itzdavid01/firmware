@@ -44,12 +44,16 @@ void setupNicheGraphics()
 {
     using namespace NicheGraphics;
 
+    LOG_INFO("setupNicheGraphics: entry, free heap: %d", ESP.getFreeHeap());
+
     // E-Ink Driver
     // -----------------------------
 
     // Use E-Ink driver
     Drivers::EInk *driver = new Drivers::ED047TC1Parallel;
     driver->begin(nullptr, -1, -1, -1); // Parallel driver doesn't need SPI/DC/CS/BUSY here
+
+    LOG_INFO("setupNicheGraphics: after driver init, free heap: %d", ESP.getFreeHeap());
 
     // InkHUD
     // ----------------------------
@@ -64,23 +68,21 @@ void setupNicheGraphics()
     inkhud->setDisplayResilience(7, 1.5);
 
     // Prepare fonts
-    InkHUD::Applet::fontLarge = FREESANS_12PT_WIN1252;
-    InkHUD::Applet::fontMedium = FREESANS_9PT_WIN1252;
-    InkHUD::Applet::fontSmall = FREESANS_6PT_WIN1252;
+    InkHUD::Applet::fontLarge = FREESANS_24PT_WIN1252;
+    InkHUD::Applet::fontMedium = FREESANS_18PT_WIN1252;
+    InkHUD::Applet::fontSmall = FREESANS_12PT_WIN1252;
 
     // Init settings, and customize defaults
     inkhud->persistence->settings.userTiles.maxCount = 4; // T5S3 Pro has a big screen!
     inkhud->persistence->settings.rotation = 3;           // 270 degrees clockwise (Portrait)
-    inkhud->persistence->settings.userTiles.count = 2;    // Two tiles by default
+    inkhud->persistence->settings.userTiles.count = 1;    // One tile by default for full-screen focus
     inkhud->persistence->settings.optionalMenuItems.nextTile = true;
     inkhud->persistence->settings.optionalFeatures.batteryIcon = true;
 
     // Setup backlight
     Drivers::LatchingBacklight *backlight = Drivers::LatchingBacklight::getInstance();
     backlight->setPin(BOARD_BL_EN);
-    if (uiconfig.screen_brightness > 0) {
-        backlight->latch();
-    }
+    backlight->off();
 
     // Pick applets
     // Note: order of applets determines priority of "auto-show" feature
@@ -88,26 +90,40 @@ void setupNicheGraphics()
     // - is activated?
     // - is autoshown?
     // - is foreground on a specific tile (index)?
+    LOG_INFO("setupNicheGraphics: before applet 1, free heap: %d", ESP.getFreeHeap());
     inkhud->addApplet("All Messages", new InkHUD::AllMessageApplet, true, true); // Activated, autoshown
+    LOG_INFO("setupNicheGraphics: after AllMessage, free heap: %d", ESP.getFreeHeap());
     inkhud->addApplet("DMs", new InkHUD::DMApplet);
+    LOG_INFO("setupNicheGraphics: after DM, free heap: %d", ESP.getFreeHeap());
     inkhud->addApplet("Channel 0", new InkHUD::ThreadedMessageApplet(0));
+    LOG_INFO("setupNicheGraphics: after ThreadedMessage0, free heap: %d", ESP.getFreeHeap());
     inkhud->addApplet("Channel 1", new InkHUD::ThreadedMessageApplet(1));
+    LOG_INFO("setupNicheGraphics: after ThreadedMessage1, free heap: %d", ESP.getFreeHeap());
     inkhud->addApplet("Positions", new InkHUD::PositionsApplet, true); // Activated
+    LOG_INFO("setupNicheGraphics: after Positions, free heap: %d", ESP.getFreeHeap());
     inkhud->addApplet("Recents List", new InkHUD::RecentsListApplet);
+    LOG_INFO("setupNicheGraphics: after RecentsList, free heap: %d", ESP.getFreeHeap());
     inkhud->addApplet("Heard", new InkHUD::HeardApplet, true, false, 0); // Activated, not autoshown, default on tile 0
+    LOG_INFO("setupNicheGraphics: after Heard, free heap: %d", ESP.getFreeHeap());
 #ifdef HAS_READER
-    inkhud->addApplet("Reader", new reader::ReaderApplet, true, false, 1); // Activated, not autoshown, tile 1
+    inkhud->addApplet("Reader", new reader::ReaderApplet, true, false, 0); // Activated, not autoshown, tile 0
+    LOG_INFO("setupNicheGraphics: after Reader, free heap: %d", ESP.getFreeHeap());
 #endif
     // inkhud->addApplet("Basic", new InkHUD::BasicExampleApplet);
     // inkhud->addApplet("NewMsg", new InkHUD::NewMsgExampleApplet);
 
     // Start running InkHUD
+    LOG_INFO("setupNicheGraphics: calling inkhud->begin()");
     inkhud->begin();
+    LOG_INFO("setupNicheGraphics: inkhud->begin() complete");
 
     // Buttons
     // --------------------------
-
-    Inputs::TwoButton *buttons = Inputs::TwoButton::getInstance(); // A shared NicheGraphics component
+    LOG_INFO("setupNicheGraphics: getting TwoButton instance");
+    Inputs::TwoButton *buttons = Inputs::TwoButton::getInstance();
+    LOG_INFO("setupNicheGraphics: TwoButton instance acquired, init observers");
+    buttons->initObservers();
+    LOG_INFO("setupNicheGraphics: observers initialized");
 
     // Setup the main user button (0)
     buttons->setWiring(0, BUTTON_PIN);
@@ -122,6 +138,7 @@ void setupNicheGraphics()
 #endif
 
     buttons->start();
+    LOG_INFO("setupNicheGraphics: complete");
 }
 
 #endif

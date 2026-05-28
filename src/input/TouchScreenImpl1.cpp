@@ -20,7 +20,8 @@ void TouchScreenImpl1::init()
 #if ARCH_PORTDUINO
     if (portduino_config.touchscreenModule) {
         TouchScreenBase::init(true);
-        inputBroker->registerSource(this);
+        if (inputBroker)
+            inputBroker->registerSource(this);
     } else {
         TouchScreenBase::init(false);
     }
@@ -29,7 +30,8 @@ void TouchScreenImpl1::init()
     return;
 #else
     TouchScreenBase::init(true);
-    inputBroker->registerSource(this);
+    if (inputBroker)
+        inputBroker->registerSource(this);
 #endif
 }
 

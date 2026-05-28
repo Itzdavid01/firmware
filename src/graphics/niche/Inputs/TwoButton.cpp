@@ -10,19 +10,19 @@ using namespace NicheGraphics::Inputs;
 
 TwoButton::TwoButton() : concurrency::OSThread("TwoButton")
 {
-    // Don't start polling buttons for release immediately
-    // Assume they are in a "released" state at boot
     OSThread::disable();
-
-#ifdef ARCH_ESP32
-    // Register callbacks for before and after lightsleep
-    lsObserver.observe(&notifyLightSleep);
-    lsEndObserver.observe(&notifyLightSleepEnd);
-#endif
 
     // Explicitly initialize these, just to keep cppcheck quiet..
     buttons[0] = Button();
     buttons[1] = Button();
+}
+
+void TwoButton::initObservers()
+{
+#ifdef ARCH_ESP32
+    lsObserver.observe(&notifyLightSleep);
+    lsEndObserver.observe(&notifyLightSleepEnd);
+#endif
 }
 
 // Get access to (or create) the singleton instance of this class

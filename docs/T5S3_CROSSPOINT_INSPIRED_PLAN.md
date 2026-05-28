@@ -41,24 +41,18 @@ namespace reader
 {
 
 // Cache key: deterministic hash of book filepath.
-// For now, layout settings are NOT included (Phase 1 scope).
-// When font/margin settings are added, include them in the hash.
 class CacheKey
 {
   public:
-    // Returns the cache root path for a given EPUB filepath.
     // e.g. "/sd/.crosspoint/epub_12345678/"
     static std::string cacheRootForEpub(const std::string& epubPath);
 
-    // Returns the path to a cached chapter file.
     // e.g. "/sd/.crosspoint/epub_12345678/sections/0.bin"
     static std::string sectionPath(const std::string& epubPath, int chapterIndex);
 
-    // Returns the path to the progress file.
     // e.g. "/sd/.crosspoint/epub_12345678/progress.bin"
     static std::string progressPath(const std::string& epubPath);
 
-    // Returns the path to the book metadata cache.
     // e.g. "/sd/.crosspoint/epub_12345678/book.bin"
     static std::string bookCachePath(const std::string& epubPath);
 };
@@ -81,16 +75,10 @@ class EpubParser
   public:
     // ... existing signatures ...
 
-    // NEW: get chapter text, checking SD cache first.
-    // Falls back to ZIP extraction if cache miss.
-    // On cache miss, writes the extracted content to SD for future hits.
     std::string getChapter(int index) override;
 
-    // NEW: invalidate the chapter cache for this book.
-    // Called when layout settings change.
     void invalidateChapterCache();
 
-    // NEW: check if SD card is present and writable.
     bool isSdCardPresent() const;
 };
 ```
@@ -109,15 +97,10 @@ struct ReadingProgress
 {
     int chapterIndex = 0;
     int pageOffset = 0;
-    uint32_t timestamp = 0; // unix epoch seconds
+    uint32_t timestamp = 0;
 };
 
-// Load reading progress from SD card.
-// Returns true if progress was found and loaded.
 bool loadProgress(const std::string& epubPath, ReadingProgress& out);
-
-// Save reading progress to SD card.
-// Returns true on success.
 bool saveProgress(const std::string& epubPath, const ReadingProgress& progress);
 
 } // namespace reader
@@ -131,16 +114,12 @@ class ReaderFSM
   public:
     // ... existing signatures ...
 
-    // NEW: save current progress (debounced by caller).
     void saveProgress();
-
-    // NEW: load saved progress for the current book.
     void loadProgress();
 
   private:
     // ... existing fields ...
 
-    // NEW: track last progress save time for debouncing.
     uint32_t lastProgressSaveMs = 0;
     static constexpr uint32_t PROGRESS_SAVE_DEBOUNCE_MS = 2000;
 };

@@ -57,12 +57,14 @@ Two subsystems share one display via a cooperative ownership flag. The mesh stac
 **New file:** `src/graphics/niche/Drivers/EInk/ED047TC1Parallel.h/cpp`
 
 Responsibilities:
+
 - Inherit from `Drivers::EInk`
 - Translate InkHUD's 1-bit GFX framebuffer → FastEPD's parallel framebuffer format
 - Map `setDisplayResilience()` fast/full refresh policy → FastEPD update modes
 - Handle V1/V2 pin differences via compile-time flags already in `variant.h`
 
 **`nicheGraphics.h` fix:**
+
 - Remove all Heltec VM-E290 content and wrong comment
 - Instantiate `ED047TC1Parallel` instead of `DEPG0290BNS800`
 - Wire GT911 touch via SensorLib
@@ -90,22 +92,24 @@ READING ──(mesh message)──► BANNER(4s) ──(auto/touch)──► REA
 
 **Document rendering stack:**
 
-| Format | Parser | Renderer |
-|--------|--------|----------|
-| TXT / Markdown | Direct | Text layout engine |
-| EPUB | miniz (ZIP) → HTML tag stripper → text extractor | Text layout engine |
-| PDF | Minimal PDF object parser (text streams only) | Text layout engine |
+| Format         | Parser                                           | Renderer           |
+| -------------- | ------------------------------------------------ | ------------------ |
+| TXT / Markdown | Direct                                           | Text layout engine |
+| EPUB           | miniz (ZIP) → HTML tag stripper → text extractor | Text layout engine |
+| PDF            | Minimal PDF object parser (text streams only)    | Text layout engine |
 
 Single text layout engine for all formats: word wrap, configurable font size, line spacing, targeting 960×540. Pages pre-chunked on book open — store character-offset index in PSRAM (not full bitmaps). Actual rendering on page turn → PSRAM framebuffer → display flush.
 
 Complex PDFs degrade gracefully to text-only extraction.
 
 **Libraries:**
+
 - ZIP: `miniz` (~50KB flash, used widely in ESP32 ecosystem)
 - No external HTML renderer — strip tags, extract text, reflow
 - PDF: custom minimal parser or `updf`
 
 **SD card layout:**
+
 ```
 /books/
   my-book.epub
@@ -131,14 +135,15 @@ Cooperative handoff — no mutex needed (both FSMs on main loop thread, no preem
 
 **Mode switch (long press on BUTTON_PIN 0):**
 
-| Direction | Sequence |
-|-----------|----------|
-| READER → INKHUD | Save page position → set flag INKHUD → InkHUD resumes last applet |
+| Direction       | Sequence                                                                 |
+| --------------- | ------------------------------------------------------------------------ |
+| READER → INKHUD | Save page position → set flag INKHUD → InkHUD resumes last applet        |
 | INKHUD → READER | InkHUD finishes frame → set flag READER → ReaderFSM redraws current page |
 
 **Mesh banner:**
 
 When `activeDisplayOwner == READER` and a mesh message arrives:
+
 1. `ReaderFSM` observes `MeshModule` message observable (existing Observer pattern)
 2. Transition to `BANNER` state — slim overlay bar at top of current page (sender + message, 60 char max)
 3. Auto-return to `READING` after 4 seconds, or on touch
@@ -146,10 +151,10 @@ When `activeDisplayOwner == READER` and a mesh message arrives:
 
 **Touch zones in reader mode:**
 
-| Zone | Action |
-|------|--------|
-| Left 30% | Previous page |
-| Right 30% | Next page |
+| Zone       | Action                                 |
+| ---------- | -------------------------------------- |
+| Left 30%   | Previous page                          |
+| Right 30%  | Next page                              |
 | Center tap | Book menu (title, chapters, bookmarks) |
 
 ---

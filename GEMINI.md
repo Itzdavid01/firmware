@@ -4,13 +4,11 @@ This file provides guidance to Google Gemini when working with code in this repo
 
 ## Canonical docs to read first
 
-- **`docs/lilygo-epaper.md`** — primary agent-facing reference.
 - **`docs/T5S3_EREADER_ROADMAP.md`** — Tracking performance and feature improvements for the E-Reader POC.
 - **`docs/T5S3_DEVELOPMENT_LOG.md`** — Log of recent attempts to fix T5S3 UI clipping, I2C buttons, and backlight synchronization.
 - **`AGENTS.md`** (repo root) — quick command reference, slash commands, MCP tool groups, house rules, recovery one-liners, env-var table.
 - **`mcp-server/README.md`** — MCP tool argument shapes, setup, test-suite invocation.
 - **`mcp-server/AGENTS.md`** — MCP server internals: module responsibilities, tool surface (43 tools), test tiers, fixtures, CLI flags, port discovery, adding new tools.
-- **`docs/lilygo-epaper.md`** — LilyGO e-paper technical reference (GxEPD2/FastEPD, pinouts, variants).
 - **`test/README.md`** — native unit-test authoring guide.
 - Nested `AGENTS.md` under `variants/`, `mcp-server/`, `src/mesh/`, `src/modules/Telemetry/Sensor/` — subsystem guidance.
 

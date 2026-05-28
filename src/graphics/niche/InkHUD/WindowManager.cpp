@@ -58,15 +58,22 @@ void InkHUD::WindowManager::addApplet(const char *name, Applet *a, bool defaultA
 void InkHUD::WindowManager::begin()
 {
     assert(inkhud);
-
+    LOG_INFO("WindowManager::begin: creating system applets");
     createSystemApplets();
+    LOG_INFO("WindowManager::begin: placing system tiles");
     placeSystemTiles();
 
+    LOG_INFO("WindowManager::begin: creating user applets (activating)");
     createUserApplets();
+    LOG_INFO("WindowManager::begin: creating user tiles");
     createUserTiles();
+    LOG_INFO("WindowManager::begin: placing user tiles");
     placeUserTiles();
+    LOG_INFO("WindowManager::begin: assigning user applets to tiles");
     assignUserAppletsToTiles();
+    LOG_INFO("WindowManager::begin: refocusTile");
     refocusTile();
+    LOG_INFO("WindowManager::begin: complete");
 }
 
 // Focus on a different tile
@@ -541,12 +548,16 @@ void InkHUD::WindowManager::createUserApplets()
     // Deactivate and remove any no-longer-needed applets
     for (uint8_t i = 0; i < inkhud->userApplets.size(); i++) {
         Applet *a = inkhud->userApplets.at(i);
+        LOG_INFO("WindowManager::createUserApplets: checking applet %d (%s), active=%d, settings.active=%d", i,
+                 a->name ? a->name : "null", a->isActive(), settings->userApplets.active[i]);
 
         // If the applet is active, but settings say it shouldn't be:
         // - run applet's custom deactivation code
         // - mark applet as inactive (internally)
-        if (a->isActive() && !settings->userApplets.active[i])
+        if (a->isActive() && !settings->userApplets.active[i]) {
+            LOG_INFO("WindowManager::createUserApplets: deactivating applet %d", i);
             a->deactivate();
+        }
     }
 
     // Activate and add any new applets
@@ -555,8 +566,10 @@ void InkHUD::WindowManager::createUserApplets()
         // If not activated, but it now should be:
         // - run applet's custom activation code
         // - mark applet as active (internally)
-        if (!inkhud->userApplets.at(i)->isActive() && settings->userApplets.active[i])
+        if (!inkhud->userApplets.at(i)->isActive() && settings->userApplets.active[i]) {
+            LOG_INFO("WindowManager::createUserApplets: activating applet %d", i);
             inkhud->userApplets.at(i)->activate();
+        }
     }
 }
 

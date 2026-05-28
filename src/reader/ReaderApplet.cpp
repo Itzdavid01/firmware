@@ -11,6 +11,8 @@ using namespace NicheGraphics::Drivers;
 namespace reader
 {
 
+static constexpr int BEZEL_MARGIN = 24;
+
 ReaderApplet::ReaderApplet()
 {
     name = "Reader";
@@ -116,23 +118,25 @@ void ReaderApplet::onNavUp()
 void ReaderApplet::refreshBookList()
 {
     fillRect(0, 0, width(), height(), Color::WHITE);
-    drawHeader("E-Reader");
+    // Offset header by bezel margin
+    int headerY = BEZEL_MARGIN;
+    drawHeader("E-Reader", headerY);
 
     auto &books = ReaderController::instance().getBookFiles();
     int selected = ReaderController::instance().getSelectedBookIndex();
-    int startY = getHeaderHeight() + 8;
+    int startY = headerY + getHeaderHeight() + 8;
 
     if (books.empty()) {
-        printAt(X(0.05f), Y(0.3f), "No books found.");
-        printAt(X(0.05f), Y(0.4f), "Copy .epub to /sd/");
+        printAt(BEZEL_MARGIN + 4, Y(0.3f), "No books found.");
+        printAt(BEZEL_MARGIN + 4, Y(0.4f), "Copy .epub to /sd/");
         return;
     }
 
-    for (int i = 0; i < (int)books.size() && i < 8; i++) {
+    for (int i = 0; i < (int)books.size() && i < 12; i++) { // Show more items on big screen
         bool sel = (i == selected);
-        int16_t y = startY + i * (fontMedium.lineHeight() + 4);
+        int16_t y = startY + i * (fontMedium.lineHeight() + 8);
         if (sel) {
-            fillRect(0, y, width(), fontMedium.lineHeight() + 4, Color::BLACK);
+            fillRect(BEZEL_MARGIN, y, width() - 2 * BEZEL_MARGIN, fontMedium.lineHeight() + 8, Color::BLACK);
             setTextColor(Color::WHITE);
         } else {
             setTextColor(Color::BLACK);
@@ -140,7 +144,7 @@ void ReaderApplet::refreshBookList()
         std::string path = books[i];
         size_t slash = path.find_last_of('/');
         std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
-        printAt(4, y, name);
+        printAt(BEZEL_MARGIN + 8, y + 2, name);
     }
     setTextColor(Color::BLACK);
 }
@@ -156,21 +160,23 @@ void ReaderApplet::refreshReading()
         bookName = bookName.substr(slash + 1);
     char header[64];
     snprintf(header, sizeof(header), "%s %d/%d", bookName.c_str(), ctrl.getCurrentChapter() + 1, ctrl.getChapterCount());
-    drawHeader(header);
+
+    int headerY = BEZEL_MARGIN;
+    drawHeader(header, headerY);
 
     const std::string &text = ctrl.getCurrentChapterText();
     int offset = ctrl.getCurrentPageOffset();
 
-    if (offset > 0 && offset < (int)text.size()) {
+    if (offset >= 0 && offset < (int)text.size()) {
         int lineStart = offset;
         while (lineStart > 0 && text[lineStart - 1] != ' ' && text[lineStart - 1] != '\n')
             lineStart--;
         std::string displayText = text.substr(lineStart);
-        int16_t top = getHeaderHeight() + 6;
-        uint16_t maxW = width() - 8;
-        printWrapped(4, top, maxW, displayText);
+        int16_t top = headerY + getHeaderHeight() + 12;
+        uint16_t maxW = width() - 2 * BEZEL_MARGIN - 8;
+        printWrapped(BEZEL_MARGIN + 4, top, maxW, displayText);
     } else if (text.empty()) {
-        printAt(X(0.05f), Y(0.3f), "[empty chapter]");
+        printAt(BEZEL_MARGIN + 4, Y(0.3f), "[empty chapter]");
     }
 }
 
