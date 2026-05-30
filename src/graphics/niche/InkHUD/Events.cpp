@@ -47,6 +47,7 @@ void InkHUD::Events::begin()
 #endif
 #ifdef ARCH_ESP32
     lightSleepObserver.observe(&notifyLightSleep);
+    lightSleepEndObserver.observe(&notifyLightSleepEnd);
 #endif
 }
 
@@ -588,6 +589,21 @@ int InkHUD::Events::beforeLightSleep(void *unused)
 {
     inkhud->awaitUpdate();
     return 0; // No special status to report. Ignored anyway by this Observable
+}
+
+// Callback for lightSleepEndObserver
+// The e-paper panel keeps showing its last image during light sleep, so a woken device is
+// visually indistinguishable from a sleeping one. When the user wakes us with a physical
+// button (GPIO wake), bring the screen back to "on" in PowerFSM and force a repaint so the
+// device feels responsive. Timer-driven wakes are ignored so we don't burn power / flash the
+// panel on every housekeeping wake.
+int InkHUD::Events::afterLightSleep(esp_sleep_wakeup_cause_t cause)
+{
+    if (cause == ESP_SLEEP_WAKEUP_GPIO) {
+        noteInkHUDUserInteraction(); // EVENT_INPUT: leave DARK, restart screen-on timeout
+        inkhud->forceUpdate();       // Repaint current applet so the woken screen reflects reality
+    }
+    return 0; // Continue notifying other observers
 }
 #endif
 

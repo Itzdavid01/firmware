@@ -9,9 +9,13 @@ std::string CacheKey::ensureCacheRootForEpub(const std::string &epubPath)
 {
     uint32_t h = hashEpubPath(epubPath);
     char buf[64];
-    snprintf(buf, sizeof(buf), "/sd/.crosspoint/epub_%08x", h);
+    snprintf(buf, sizeof(buf), "/.crosspoint/epub_%08x", h);
     std::string root(buf);
 
+    // SD/FAT mkdir does not create intermediate directories, so create the parent
+    // ".crosspoint" first — otherwise the epub_* dir (and all cache/progress writes
+    // inside it) silently fail and reading progress is never persisted.
+    SD.mkdir("/.crosspoint");
     SD.mkdir(root.c_str());
     SD.mkdir((root + "/sections").c_str());
 
@@ -22,7 +26,7 @@ std::string CacheKey::sectionPath(const std::string &epubPath, int chapterIndex)
 {
     uint32_t h = hashEpubPath(epubPath);
     char buf[64];
-    snprintf(buf, sizeof(buf), "/sd/.crosspoint/epub_%08x/sections/%d.bin", h, chapterIndex);
+    snprintf(buf, sizeof(buf), "/.crosspoint/epub_%08x/sections/%d.bin", h, chapterIndex);
     return std::string(buf);
 }
 
@@ -30,7 +34,7 @@ std::string CacheKey::progressPath(const std::string &epubPath)
 {
     uint32_t h = hashEpubPath(epubPath);
     char buf[64];
-    snprintf(buf, sizeof(buf), "/sd/.crosspoint/epub_%08x/progress.bin", h);
+    snprintf(buf, sizeof(buf), "/.crosspoint/epub_%08x/progress.bin", h);
     return std::string(buf);
 }
 
@@ -38,7 +42,7 @@ std::string CacheKey::bookCachePath(const std::string &epubPath)
 {
     uint32_t h = hashEpubPath(epubPath);
     char buf[64];
-    snprintf(buf, sizeof(buf), "/sd/.crosspoint/epub_%08x/book.bin", h);
+    snprintf(buf, sizeof(buf), "/.crosspoint/epub_%08x/book.bin", h);
     return std::string(buf);
 }
 

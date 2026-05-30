@@ -1,11 +1,173 @@
 #include "ReaderFSM.h"
 #include "gps/RTC.h"
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 #include <dirent.h>
 #include <sys/stat.h>
 
 namespace reader
 {
+
+namespace
+{
+// Case-insensitive check whether `kw` (lowercase) matches s at pos.
+bool matchKw(const std::string &s, size_t pos, const char *kw)
+{
+    for (size_t k = 0; kw[k]; ++k) {
+        if (pos + k >= s.size())
+            return false;
+        char c = s[pos + k];
+        if (c >= 'A' && c <= 'Z')
+            c = (char)(c + 32);
+        if (c != kw[k])
+            return false;
+    }
+    return true;
+}
+
+// Convert a chapter's (X)HTML into readable plain text:
+//  - skips <head>/<style>/<script> blocks and comments entirely
+//  - turns block-level tags into newlines, drops all other tags
+//  - decodes the common HTML entities, collapses runs of whitespace
+std::string htmlToText(const std::string &html)
+{
+    std::string out;
+    out.reserve(html.size());
+    size_t i = 0, n = html.size();
+    bool lastSpace = true; // collapse leading whitespace
+
+    auto findCloseCI = [&](size_t from, const char *closeLower) -> size_t {
+        for (size_t p = from; p < n; ++p)
+            if (matchKw(html, p, closeLower))
+                return p;
+        return std::string::npos;
+    };
+
+    while (i < n) {
+        char ch = html[i];
+        if (ch == '<') {
+            if (matchKw(html, i, "<!--")) {
+                size_t e = html.find("-->", i + 4);
+                i = (e == std::string::npos) ? n : e + 3;
+                continue;
+            }
+            static const char *openTags[] = {"<style", "<script", "<head"};
+            static const char *closeTags[] = {"</style>", "</script>", "</head>"};
+            bool skipped = false;
+            for (int b = 0; b < 3; ++b) {
+                if (matchKw(html, i, openTags[b])) {
+                    size_t e = findCloseCI(i, closeTags[b]);
+                    i = (e == std::string::npos) ? n : e + strlen(closeTags[b]);
+                    skipped = true;
+                    break;
+                }
+            }
+            if (skipped)
+                continue;
+            bool brk = matchKw(html, i, "</p") || matchKw(html, i, "<br") || matchKw(html, i, "</div") ||
+                       matchKw(html, i, "</h1") || matchKw(html, i, "</h2") || matchKw(html, i, "</h3") ||
+                       matchKw(html, i, "</li") || matchKw(html, i, "</tr");
+            size_t e = html.find('>', i);
+            i = (e == std::string::npos) ? n : e + 1;
+            if (brk && !out.empty() && out.back() != '\n') {
+                out.push_back('\n');
+                lastSpace = true;
+            }
+            continue;
+        }
+        if (ch == '&') {
+            size_t sc = html.find(';', i);
+            if (sc != std::string::npos && sc - i <= 10) {
+                std::string ent = html.substr(i + 1, sc - i - 1);
+                std::string rep;
+                if (ent == "amp")
+                    rep = "&";
+                else if (ent == "lt")
+                    rep = "<";
+                else if (ent == "gt")
+                    rep = ">";
+                else if (ent == "quot")
+                    rep = "\"";
+                else if (ent == "apos")
+                    rep = "'";
+                else if (ent == "nbsp")
+                    rep = " ";
+                else if (!ent.empty() && ent[0] == '#') {
+                    long cp = (ent.size() > 1 && (ent[1] == 'x' || ent[1] == 'X')) ? strtol(ent.c_str() + 2, nullptr, 16)
+                                                                                   : strtol(ent.c_str() + 1, nullptr, 10);
+                    if (cp == 8217 || cp == 8216 || cp == 39)
+                        rep = "'";
+                    else if (cp == 8220 || cp == 8221)
+                        rep = "\"";
+                    else if (cp == 8211 || cp == 8212)
+                        rep = "-";
+                    else if (cp == 8230)
+                        rep = "...";
+                    else if (cp > 0 && cp < 128)
+                        rep = std::string(1, (char)cp);
+                }
+                out += rep;
+                i = sc + 1;
+                lastSpace = (rep == " ");
+                continue;
+            }
+        }
+        // Normalize common non-ASCII UTF-8 punctuation to ASCII, since the e-paper
+        // font has no glyphs for them (otherwise they render as garbage).
+        unsigned char uc = (unsigned char)ch;
+        if (uc >= 0x80) {
+            if (uc == 0xE2 && i + 2 < n && (unsigned char)html[i + 1] == 0x80) {
+                unsigned char c3 = (unsigned char)html[i + 2];
+                const char *rep = nullptr;
+                if (c3 == 0x98 || c3 == 0x99)
+                    rep = "'"; // ‘ ’
+                else if (c3 == 0x9C || c3 == 0x9D)
+                    rep = "\""; // “ ”
+                else if (c3 == 0x93 || c3 == 0x94)
+                    rep = "-"; // – —
+                else if (c3 == 0xA6)
+                    rep = "..."; // …
+                if (rep) {
+                    out += rep;
+                    i += 3;
+                    lastSpace = false;
+                    continue;
+                }
+            }
+            if (uc == 0xC2 && i + 1 < n && (unsigned char)html[i + 1] == 0xA0) { // nbsp
+                i += 2;
+                if (!lastSpace) {
+                    out.push_back(' ');
+                    lastSpace = true;
+                }
+                continue;
+            }
+            // Unknown high byte: pass through (font may map it via its own table).
+            out.push_back(ch);
+            ++i;
+            lastSpace = false;
+            continue;
+        }
+
+        ++i;
+        if (ch == '\r')
+            continue;
+        if (ch == '\n' || ch == '\t')
+            ch = ' ';
+        if (ch == ' ') {
+            if (!lastSpace) {
+                out.push_back(' ');
+                lastSpace = true;
+            }
+        } else {
+            out.push_back(ch);
+            lastSpace = false;
+        }
+    }
+    return out;
+}
+} // namespace
 
 ReaderController::ReaderController() = default;
 
@@ -113,7 +275,7 @@ int ReaderController::getChapterCount() const
 void ReaderController::refreshChapterText()
 {
     if (!openBookPath.empty())
-        currentChapterText = parser.getChapter(currentChapter);
+        currentChapterText = htmlToText(parser.getChapter(currentChapter));
 }
 
 // ── Navigation ────────────────────────────────────────
@@ -193,8 +355,10 @@ void ReaderController::loadProgress()
     if (loadReadingProgress(openBookPath, p)) {
         if (p.chapterIndex >= 0 && p.chapterIndex < parser.getChapterCount()) {
             currentChapter = p.chapterIndex;
-            currentPageOffset = std::max(0, p.pageOffset);
             refreshChapterText();
+            // Clamp restored offset to the current (HTML-stripped) chapter length so a
+            // stale offset never lands past the end and shows a blank page.
+            currentPageOffset = std::max<int32_t>(0, std::min<int32_t>(p.pageOffset, (int32_t)currentChapterText.length()));
         }
     }
 }

@@ -53,7 +53,8 @@ class Events
     int onReceiveTextMessage(const meshtastic_MeshPacket *packet); // Store most recent text message
     int onAdminMessage(AdminModule_ObserverData *data);            // Handle incoming admin messages
 #ifdef ARCH_ESP32
-    int beforeLightSleep(void *unused); // Prepare for light sleep
+    int beforeLightSleep(void *unused);                  // Prepare for light sleep
+    int afterLightSleep(esp_sleep_wakeup_cause_t cause); // Repaint after waking from light sleep
 #endif
 
   private:
@@ -78,6 +79,12 @@ class Events
 #ifdef ARCH_ESP32
     // Get notified when the system is entering light sleep
     CallbackObserver<Events, void *> lightSleepObserver = CallbackObserver<Events, void *>(this, &Events::beforeLightSleep);
+
+    // Get notified when the system has woken from light sleep, so we can repaint the panel.
+    // The e-paper retains its last image while asleep, so without an explicit repaint a woken
+    // device looks identical to a sleeping one ("frozen"). See afterLightSleep().
+    CallbackObserver<Events, esp_sleep_wakeup_cause_t> lightSleepEndObserver =
+        CallbackObserver<Events, esp_sleep_wakeup_cause_t>(this, &Events::afterLightSleep);
 #endif
 
     // End any externalNotification beeping, buzzing, blinking etc

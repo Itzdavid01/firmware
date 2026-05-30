@@ -143,6 +143,10 @@ void setupNicheGraphics()
 #if defined(T5_S3_EPAPER_PRO_V1)
     buttons->setWiring(0, PIN_BUTTON2);
 #else
+    // V2 / standard: BOOT button is on GPIO0 (BUTTON_PIN). Without this the button
+    // is never wired, so start() attaches an ISR to an unconfigured pin (gpio_isr
+    // error + "IO 0 is not set as GPIO" flood) and the BOOT button never registers.
+    buttons->setWiring(0, BUTTON_PIN, true);
 #endif
     buttons->setHandlerShortPress(0, [inkhud]() { inkhud->shortpress(); });
     buttons->setHandlerLongPress(0, [inkhud]() { inkhud->longpress(); });

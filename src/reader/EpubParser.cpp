@@ -207,7 +207,7 @@ void EpubParser::invalidateChapterCache()
 
 bool EpubParser::isSdCardPresent() const
 {
-    File f = SD.open("/sd/", FILE_READ);
+    File f = SD.open("/", FILE_READ); // Arduino SD prepends its "/sd" mountpoint
     if (!f)
         return false;
     bool isDir = f.isDirectory();

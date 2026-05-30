@@ -120,7 +120,7 @@ void ReaderApplet::refreshBookList()
     fillRect(0, 0, width(), height(), Color::WHITE);
     // Offset header by bezel margin
     int headerY = BEZEL_MARGIN;
-    drawHeader("E-Reader", headerY);
+    drawHeader("E-Reader");
 
     auto &books = ReaderController::instance().getBookFiles();
     int selected = ReaderController::instance().getSelectedBookIndex();
@@ -162,10 +162,13 @@ void ReaderApplet::refreshReading()
     snprintf(header, sizeof(header), "%s %d/%d", bookName.c_str(), ctrl.getCurrentChapter() + 1, ctrl.getChapterCount());
 
     int headerY = BEZEL_MARGIN;
-    drawHeader(header, headerY);
+    drawHeader(header);
 
     const std::string &text = ctrl.getCurrentChapterText();
     int offset = ctrl.getCurrentPageOffset();
+
+    // Body text: use the larger general-purpose font for comfortable reading.
+    setFont(fontMedium);
 
     if (offset >= 0 && offset < (int)text.size()) {
         int lineStart = offset;
