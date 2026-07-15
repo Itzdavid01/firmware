@@ -961,19 +961,16 @@ void setup()
 #if HAS_SCREEN
     if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
 
+#ifndef MESHTASTIC_EXCLUDE_SCREEN
 #if defined(HAS_SPI_TFT) || defined(USE_EINK) || defined(USE_SPISSD1306)
         screen = new graphics::Screen(screen_found, screen_model, screen_geometry);
-#endif
 #elif defined(ARCH_PORTDUINO)
         if ((screen_found.port != ScanI2C::I2CPort::NO_I2C || portduino_config.displayPanel) &&
             config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
-#ifndef MESHTASTIC_EXCLUDE_SCREEN
             screen = new graphics::Screen(screen_found, screen_model, screen_geometry);
-#endif
         }
 #else
         if (screen_found.port != ScanI2C::I2CPort::NO_I2C)
-#ifndef MESHTASTIC_EXCLUDE_SCREEN
             screen = new graphics::Screen(screen_found, screen_model, screen_geometry);
 #endif
 #endif
