@@ -8,7 +8,9 @@
         "meshtastic-mcp"
       ],
       "env": {
-        "MESHTASTIC_FIRMWARE_ROOT": "."
+        "MESHTASTIC_FIRMWARE_ROOT": ".",
+        "MESHTASTIC_UI_CAMERA_DEVICE": "1",
+        "MESHTASTIC_UI_CAMERA_BACKEND": "opencv"
       }
     }
   }
