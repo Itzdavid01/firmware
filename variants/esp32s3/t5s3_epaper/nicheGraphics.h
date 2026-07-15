@@ -66,9 +66,10 @@ void setupNicheGraphics()
     // Set the driver
     inkhud->setDriver(driver);
 
-    // Set how many FAST updates per FULL update
-    // Set how unhealthy additional FAST updates beyond this number are
-    inkhud->setDisplayResilience(7, 1.5);
+    // Large 4.7" ED047TC1 panel: FAST updates are full-screen spatially,
+    // so FULL refreshes are visually disruptive. Use conservative thresholds
+    // to reduce slow FULL refresh frequency and maintenance refreshes.
+    inkhud->setDisplayResilience(20, 2.0);
 
     // Prepare fonts - use larger sizes to suit the 4.7" screen at ~234 DPI
     InkHUD::Applet::fontLarge = FREESANS_24PT_WIN1253;
@@ -152,7 +153,7 @@ void setupNicheGraphics()
     buttons->setHandlerLongPress(0, [inkhud]() { inkhud->longpress(); });
 
 #if defined(T5_S3_EPAPER_PRO_V1)
-    // Aux button (1) — V1 has two buttons
+    // Aux button (1) - V1 has two buttons
     buttons->setWiring(1, PIN_BUTTON2);
     buttons->setHandlerShortPress(1, [inkhud]() { inkhud->nextTile(); });
 #endif
