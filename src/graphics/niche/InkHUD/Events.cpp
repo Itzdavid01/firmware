@@ -546,15 +546,33 @@ int InkHUD::Events::onReceiveTextMessage(const meshtastic_MeshPacket *packet)
         // Broadcasts are added to the global store by ThreadedMessageApplet::handleReceived().
         // Here we only update the latestMessage cache used by AllMessageApplet / NotificationApplet.
         StoredMessage &sm = inkhud->persistence->latestMessage.broadcast;
+
+        // Mirror MessageStore::assignTimestamp behavior
+        uint32_t nowSecs = getValidTime(RTCQuality::RTCQualityDevice, true);
+        if (nowSecs) {
+            sm.timestamp = nowSecs;
+            sm.isBootRelative = false;
+        } else {
+            sm.timestamp = millis() / 1000;
+            sm.isBootRelative = true;
+        }
+
         sm.sender = packet->from;
-        sm.timestamp = getValidTime(RTCQuality::RTCQualityDevice, true);
+        sm.dest = packet->to;
+        sm.type = MessageType::BROADCAST;
+        sm.ackStatus = AckStatus::ACKED; // incoming broadcast
         sm.channelIndex = packet->channel;
+
         const char *payload = reinterpret_cast<const char *>(packet->decoded.payload.bytes);
         size_t storedLen = packet->decoded.payload.size;
         if (storedLen >= MAX_MESSAGE_SIZE)
             storedLen = MAX_MESSAGE_SIZE - 1;
         sm.textOffset = MessageStore::storeText(payload, storedLen);
         sm.textLength = static_cast<uint16_t>(storedLen);
+
+#if !(MESHTASTIC_EXCLUDE_PKI_KEYGEN || MESHTASTIC_EXCLUDE_PKI)
+        sm.xeddsaSigned = packet->xeddsa_signed;
+#endif
     }
 
     return 0; // Tell caller to continue notifying other observers. (No reason to abort this event)
