@@ -125,7 +125,7 @@ std::string htmlToText(const std::string &html)
                 else if (c3 == 0x9C || c3 == 0x9D)
                     rep = "\""; // “ ”
                 else if (c3 == 0x93 || c3 == 0x94)
-                    rep = "-"; // – —
+                    rep = "-"; // - -
                 else if (c3 == 0xA6)
                     rep = "..."; // …
                 if (rep) {
@@ -280,49 +280,30 @@ void ReaderController::refreshChapterText()
 
 // ── Navigation ────────────────────────────────────────
 
-void ReaderController::nextPage()
+bool ReaderController::nextChapter()
 {
-    if (!isBookOpen())
-        return;
-    int textLen = (int)currentChapterText.length();
-    int step = 500;
-
-    if (currentPageOffset + step >= textLen) {
-        if (currentChapter < parser.getChapterCount() - 1) {
-            currentChapter++;
-            currentPageOffset = 0;
-            refreshChapterText();
-        } else {
-            currentPageOffset = std::max(0, textLen - 100);
-        }
-    } else {
-        int target = currentPageOffset + step;
-        while (target < textLen && currentChapterText[target] != ' ' && currentChapterText[target] != '\n')
-            target++;
-        currentPageOffset = target;
-    }
+    if (!isBookOpen() || currentChapter >= parser.getChapterCount() - 1)
+        return false;
+    currentChapter++;
+    currentPageOffset = 0;
+    refreshChapterText();
+    return true;
 }
 
-void ReaderController::prevPage()
+bool ReaderController::prevChapter()
 {
-    if (!isBookOpen())
-        return;
-    int step = 500;
+    if (!isBookOpen() || currentChapter <= 0)
+        return false;
+    currentChapter--;
+    currentPageOffset = 0;
+    refreshChapterText();
+    return true;
+}
 
-    if (currentPageOffset <= step) {
-        if (currentChapter > 0) {
-            currentChapter--;
-            refreshChapterText();
-            currentPageOffset = std::max(0, (int)currentChapterText.length() - step);
-        } else {
-            currentPageOffset = 0;
-        }
-    } else {
-        int target = currentPageOffset - step;
-        while (target > 0 && currentChapterText[target - 1] != ' ' && currentChapterText[target - 1] != '\n')
-            target--;
-        currentPageOffset = target;
-    }
+void ReaderController::setPageOffset(int offset)
+{
+    int len = (int)currentChapterText.length();
+    currentPageOffset = std::max(0, std::min(offset, len));
 }
 
 // ── Progress persistence ─────────────────────────────────

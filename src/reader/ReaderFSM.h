@@ -11,7 +11,7 @@ class ReaderApplet;
 namespace reader
 {
 
-// Pure state machine — no display, no input, no Applet dependency.
+// Pure state machine - no display, no input, no Applet dependency.
 // Singleton accessed via ReaderController::instance().
 class ReaderController
 {
@@ -36,8 +36,12 @@ class ReaderController
     int getChapterCount() const;
 
     // ── Navigation ────────────────────────────────────────
-    void nextPage(); // advance ~500 chars or next chapter
-    void prevPage(); // retreat ~500 chars or prev chapter
+    // Page-level navigation now lives in the applet (it owns font metrics and
+    // measures real pages). The controller exposes chapter stepping + the
+    // current page-start char offset.
+    bool nextChapter();             // advance to next chapter (offset 0); false if at last
+    bool prevChapter();             // retreat to previous chapter (offset 0); false if at first
+    void setPageOffset(int offset); // set the current page-start char offset
 
     // ── Progress persistence ─────────────────────────────
     struct Progress {
@@ -70,11 +74,11 @@ class ReaderController
     void saveProgress();
 };
 
-// Deprecated alias — existing code that references ReaderFSM still works.
+// Deprecated alias - existing code that references ReaderFSM still works.
 class ReaderFSM
 {
   public:
-    static ReaderFSM *getInstance() { return nullptr; } // Returns nullptr — migration aid
+    static ReaderFSM *getInstance() { return nullptr; } // Returns nullptr - migration aid
     void init() { ReaderController::instance().scanForBooks(); }
     void launch() {}
     void update() {}
